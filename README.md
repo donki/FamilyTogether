@@ -17,17 +17,16 @@ Una aplicación móvil multiplataforma desarrollada en .NET MAUI que permite a l
 
 ```
 FamilyTogether/
-├── 📱 FamilyTogether.App/          # Aplicación móvil .NET MAUI
+├── 📱 FamilyTogether.App/          # Aplicación móvil .NET MAUI (Android)
 │   ├── Pages/                      # Páginas de la aplicación
 │   ├── Services/                   # Servicios (Location, Auth, etc.)
 │   ├── Models/                     # Modelos de datos
 │   ├── Controls/                   # Controles personalizados
-│   └── Platforms/                  # Código específico por plataforma
-├── ⚡ FamilyTogether.Functions/     # Backend Azure Functions
-│   ├── Functions/                  # Endpoints de la API
+│   └── Platforms/Android/          # Código específico para Android
+├── ⚡ FamilyTogether.Functions/     # Backend Azure Functions (Serverless)
+│   ├── Functions/                  # Endpoints de la API REST
 │   ├── Services/                   # Lógica de negocio
-│   └── Models/                     # DTOs y modelos
-├── 🖥️ FamilyTogether.Server/       # Servidor ASP.NET Core (legacy)
+│   └── Models/                     # DTOs y modelos de datos
 └── 📋 .kiro/specs/                 # Documentación y especificaciones
 ```
 
@@ -40,11 +39,12 @@ FamilyTogether/
 - **Mapsui** - Mapas interactivos
 - **BCrypt.Net** - Encriptación de contraseñas
 
-### Backend (Azure Functions)
-- **Azure Functions v4** - Serverless computing
-- **System.IdentityModel.Tokens.Jwt** - Autenticación JWT
-- **Newtonsoft.Json** - Serialización JSON
-- **Almacenamiento en memoria + JSON** - Persistencia de datos
+### Backend (Azure Functions - Capa Gratuita)
+- **Azure Functions v4** - Serverless computing en capa gratuita
+- **System.IdentityModel.Tokens.Jwt** - Autenticación JWT segura
+- **Newtonsoft.Json** - Serialización JSON para persistencia
+- **Almacenamiento en memoria + archivos JSON** - Base de datos simple y eficiente
+- **Escalabilidad automática** - Se adapta al uso sin costos fijos
 
 ## 🔋 Optimizaciones de Batería
 
@@ -96,6 +96,11 @@ cd FamilyTogether
 #### 2. Configurar el Backend (Azure Functions)
 ```bash
 cd FamilyTogether.Functions
+
+# Instalar Azure Functions Core Tools si no lo tienes
+# npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+# Ejecutar localmente
 func start
 ```
 
@@ -109,7 +114,7 @@ dotnet build -f net10.0-android -t:Run
 
 ### ⚙️ Configuración
 
-#### Backend (local.settings.json)
+#### Backend Azure Functions (local.settings.json)
 ```json
 {
   "IsEncrypted": false,
@@ -122,18 +127,51 @@ dotnet build -f net10.0-android -t:Run
 }
 ```
 
+#### Despliegue en Azure (Capa Gratuita)
+```bash
+# Crear Function App en Azure (capa gratuita)
+az functionapp create --resource-group myResourceGroup \
+  --consumption-plan-location westeurope \
+  --runtime dotnet-isolated \
+  --functions-version 4 \
+  --name familytogether-api \
+  --storage-account mystorageaccount
+
+# Desplegar
+func azure functionapp publish familytogether-api
+```
+
 #### App Móvil
 Actualiza la URL del API en `ApiService.cs`:
 ```csharp
+// Para desarrollo local
 private const string BaseUrl = "http://localhost:7071/api";
+
+// Para producción en Azure (reemplaza con tu URL)
+// private const string BaseUrl = "https://familytogether-api.azurewebsites.net/api";
 ```
+
+## ☁️ Azure Functions - Capa Gratuita
+
+### 💰 **Beneficios Económicos**
+- **1 millón de solicitudes gratuitas** por mes
+- **400,000 GB-segundos de ejecución** incluidos
+- **Sin costos fijos** - Solo pagas por uso adicional
+- **Escalabilidad automática** según demanda
+
+### 🚀 **Ventajas Técnicas**
+- **Arranque en frío optimizado** con .NET 10
+- **Almacenamiento JSON simple** - Sin bases de datos complejas
+- **Despliegue automático** desde GitHub
+- **Monitoreo integrado** con Application Insights
 
 ## 🔐 Seguridad y Privacidad
 
 - **🔒 Autenticación JWT** - Tokens seguros con expiración
 - **🛡️ Encriptación de contraseñas** - BCrypt con salt
 - **📍 Datos de ubicación privados** - Solo compartidos con familia
-- **🗂️ Almacenamiento local** - Los datos se guardan localmente en JSON
+- **🗂️ Almacenamiento en archivos JSON** - Simple y transparente
+- **☁️ Hospedado en Azure** - Infraestructura segura de Microsoft
 - **🚫 Sin tracking externo** - No se comparten datos con terceros
 
 ## 📋 API Endpoints
@@ -178,6 +216,17 @@ Si encuentras un bug, por favor [abre un issue](https://github.com/tu-usuario/Fa
 - Pasos para reproducir
 - Capturas de pantalla (si aplica)
 - Información del dispositivo y versión de la app
+
+## 🚀 Despliegue en Producción
+
+Para desplegar la API en Azure Functions (capa gratuita), consulta la guía detallada:
+👉 **[Guía de Despliegue en Azure](deploy-azure.md)**
+
+### Pasos rápidos:
+1. Crear Function App en Azure
+2. Configurar variables de entorno
+3. Desplegar con `func azure functionapp publish`
+4. Actualizar URL en la app móvil
 
 ## 📄 Licencia
 

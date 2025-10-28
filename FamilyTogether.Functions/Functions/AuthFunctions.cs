@@ -32,7 +32,7 @@ public class AuthFunctions
             if (loginRequest == null || string.IsNullOrEmpty(loginRequest.Email) || string.IsNullOrEmpty(loginRequest.Password))
             {
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteAsJsonAsync(ApiResponse.Error("Email and password are required"));
+                await badRequestResponse.WriteAsJsonAsync(ApiResponse.CreateError("Email and password are required"));
                 return badRequestResponse;
             }
 
@@ -41,7 +41,7 @@ public class AuthFunctions
             if (authResponse == null)
             {
                 var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-                await unauthorizedResponse.WriteAsJsonAsync(ApiResponse.Error("Invalid email or password"));
+                await unauthorizedResponse.WriteAsJsonAsync(ApiResponse.CreateError("Invalid email or password"));
                 return unauthorizedResponse;
             }
 
@@ -53,7 +53,7 @@ public class AuthFunctions
         {
             _logger.LogError(ex, "Error during login");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteAsJsonAsync(ApiResponse.Error("Internal server error"));
+            await errorResponse.WriteAsJsonAsync(ApiResponse.CreateError("Internal server error"));
             return errorResponse;
         }
     }
@@ -72,14 +72,14 @@ public class AuthFunctions
                 string.IsNullOrEmpty(registerRequest.Password) || string.IsNullOrEmpty(registerRequest.Name))
             {
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteAsJsonAsync(ApiResponse.Error("Email, name, and password are required"));
+                await badRequestResponse.WriteAsJsonAsync(ApiResponse.CreateError("Email, name, and password are required"));
                 return badRequestResponse;
             }
 
             if (registerRequest.Password.Length < 6)
             {
                 var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badRequestResponse.WriteAsJsonAsync(ApiResponse.Error("Password must be at least 6 characters long"));
+                await badRequestResponse.WriteAsJsonAsync(ApiResponse.CreateError("Password must be at least 6 characters long"));
                 return badRequestResponse;
             }
 
@@ -88,7 +88,7 @@ public class AuthFunctions
             if (authResponse == null)
             {
                 var conflictResponse = req.CreateResponse(HttpStatusCode.Conflict);
-                await conflictResponse.WriteAsJsonAsync(ApiResponse.Error("User with this email already exists"));
+                await conflictResponse.WriteAsJsonAsync(ApiResponse.CreateError("User with this email already exists"));
                 return conflictResponse;
             }
 
@@ -100,7 +100,7 @@ public class AuthFunctions
         {
             _logger.LogError(ex, "Error during registration");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteAsJsonAsync(ApiResponse.Error("Internal server error"));
+            await errorResponse.WriteAsJsonAsync(ApiResponse.CreateError("Internal server error"));
             return errorResponse;
         }
     }

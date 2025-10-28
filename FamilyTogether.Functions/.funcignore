@@ -1,0 +1,13 @@
+*.js.map
+*.ts
+.git*
+.vscode
+local.settings.json
+test
+tsconfig.json
+.funcignore
+*.log
+bin
+obj
+appsettings.json
+local.settings.json

@@ -27,9 +27,12 @@ public class ApiResponse<T>
     }
 }
 
-public class ApiResponse : ApiResponse<object>
+public class ApiResponse
 {
-    public static ApiResponse Success(string message = "Success")
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    
+    public static ApiResponse CreateSuccess(string message = "Success")
     {
         return new ApiResponse
         {
@@ -38,7 +41,7 @@ public class ApiResponse : ApiResponse<object>
         };
     }
     
-    public static ApiResponse Error(string message)
+    public static ApiResponse CreateError(string message)
     {
         return new ApiResponse
         {
