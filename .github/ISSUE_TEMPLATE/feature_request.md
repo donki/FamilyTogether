@@ -20,10 +20,9 @@ Una descripción clara y concisa de lo que quieres que pase.
 Una descripción clara y concisa de cualquier solución alternativa o características que hayas considerado.
 
 ## 📱 Plataforma Objetivo
-- [ ] Android
-- [ ] iOS  
-- [ ] Windows
-- [ ] Todas las plataformas
+- [ ] Android (Emulador)
+- [ ] Android (Dispositivo físico)
+- [ ] Ambos
 
 ## 🎯 Prioridad
 - [ ] Baja

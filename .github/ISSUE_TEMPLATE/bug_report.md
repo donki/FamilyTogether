@@ -22,11 +22,12 @@ Una descripción clara y concisa de lo que esperabas que pasara.
 ## ❌ Comportamiento Actual
 Una descripción clara y concisa de lo que está pasando actualmente.
 
-## 📱 Información del Dispositivo
-- **Plataforma**: [Android/iOS/Windows]
-- **Versión del OS**: [ej. Android 13, iOS 16.1]
-- **Modelo del dispositivo**: [ej. Samsung Galaxy S23, iPhone 14]
+## 📱 Información del Dispositivo Android
+- **Versión de Android**: [ej. Android 13, Android 14]
+- **Modelo del dispositivo**: [ej. Samsung Galaxy S23, Pixel 7]
+- **Fabricante**: [ej. Samsung, Google, Xiaomi]
 - **Versión de la app**: [ej. 1.0.0]
+- **Tipo de instalación**: [APK directo / Google Play Store]
 
 ## 📸 Capturas de Pantalla
 Si aplica, añade capturas de pantalla para ayudar a explicar el problema.

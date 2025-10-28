@@ -28,9 +28,8 @@ Describe las pruebas que ejecutaste para verificar tus cambios.
 - [ ] Test B
 
 ## 📱 Plataformas Probadas
-- [ ] Android
-- [ ] iOS
-- [ ] Windows
+- [ ] Android (Emulador)
+- [ ] Android (Dispositivo físico)
 
 ## 📸 Capturas de Pantalla (si aplica)
 Añade capturas de pantalla para ayudar a explicar los cambios visuales.

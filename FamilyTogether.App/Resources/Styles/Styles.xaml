@@ -129,7 +129,7 @@
         <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceVariant}, Dark={StaticResource Gray400}}" />
         <Setter Property="MinimumHeightRequest" Value="56"/>
         <Setter Property="MinimumWidthRequest" Value="48"/>
-        <Setter Property="Padding" Value="16,16"/>
+        <!-- Padding removed as it's not supported on Entry in .NET 10 -->
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
                 <VisualStateGroup x:Name="CommonStates">

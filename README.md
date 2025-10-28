@@ -10,7 +10,7 @@ Una aplicación móvil multiplataforma desarrollada en .NET MAUI que permite a l
 - 👥 **Gestión de familias** - Crea y únete a grupos familiares fácilmente
 - 🔐 **Autenticación segura** - Sistema de login con JWT tokens
 - 🗺️ **Mapas interactivos** - Visualiza la ubicación de todos los miembros en tiempo real
-- 📱 **Multiplataforma** - Disponible para Android, iOS y Windows
+- 📱 **Android nativo** - Optimizado específicamente para dispositivos Android
 - ☁️ **Backend serverless** - Powered by Azure Functions
 
 ## 🏗️ Arquitectura del Proyecto
@@ -99,11 +99,12 @@ cd FamilyTogether.Functions
 func start
 ```
 
-#### 3. Configurar la App Móvil
+#### 3. Configurar la App Móvil (Android)
 ```bash
 cd FamilyTogether.App
-dotnet build
-dotnet run --framework net10.0-android  # Para Android
+dotnet build -f net10.0-android
+# Para ejecutar en emulador o dispositivo Android conectado
+dotnet build -f net10.0-android -t:Run
 ```
 
 ### ⚙️ Configuración
@@ -198,7 +199,7 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo [LICENSE](LICENSE) para
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Windows-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Android-green)
 
 ---
 

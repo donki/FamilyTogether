@@ -14,7 +14,7 @@ public static class MaterialAnimations
     public static readonly Easing StandardEasing = Easing.CubicOut;
     public static readonly Easing AccelerateEasing = Easing.CubicIn;
     public static readonly Easing DecelerateEasing = Easing.CubicOut;
-    public static readonly Easing EmphasizedEasing = new Easing(0.2, 0.0, 0, 1.0);
+    public static readonly Easing EmphasizedEasing = Easing.CubicInOut;
 
     /// <summary>
     /// Animación de entrada fade in con slide up
