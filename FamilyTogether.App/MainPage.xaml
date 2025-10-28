@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.MainPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
+             xmlns:controls="clr-namespace:FamilyTogether.App.Controls"
+             Title="FamilyTogether">
+
+    <Grid RowDefinitions="*,Auto,200">
+        
+        <!-- Mapa -->
+        <mapsui:MapView x:Name="MapView" 
+                        Grid.Row="0"
+                        BackgroundColor="LightGray" />
+
+        <!-- Barra de estado y controles Material Design -->
+        <Frame Grid.Row="1" 
+               BackgroundColor="{StaticResource Primary}"
+               CornerRadius="0"
+               Padding="16,12"
+               HasShadow="False">
+            
+            <Grid ColumnDefinitions="*,Auto">
+                
+                <VerticalStackLayout Grid.Column="0" 
+                                     VerticalOptions="Center"
+                                     Spacing="4">
+                    <Label x:Name="StatusLabel"
+                           Text="Iniciando..."
+                           TextColor="{StaticResource OnPrimary}"
+                           Style="{StaticResource MaterialBodyMedium}"
+                           FontAttributes="Bold" />
+                    <Label x:Name="CacheStatusLabel"
+                           Text=""
+                           TextColor="{StaticResource OnPrimary}"
+                           Style="{StaticResource MaterialBodySmall}"
+                           Opacity="0.8" />
+                </VerticalStackLayout>
+                
+                <HorizontalStackLayout Grid.Column="1" 
+                                       Spacing="8">
+                    
+                    <Button x:Name="NotificationButton"
+                            Text="🔔"
+                            Style="{StaticResource MaterialIconButton}"
+                            TextColor="{StaticResource OnPrimary}"
+                            BackgroundColor="Transparent"
+                            Clicked="OnNotificationsClicked" />
+                    
+                    <Button Text="🔄"
+                            Style="{StaticResource MaterialIconButton}"
+                            TextColor="{StaticResource OnPrimary}"
+                            BackgroundColor="Transparent"
+                            Clicked="OnRefreshClicked" />
+                    
+                    <Button Text="👥"
+                            Style="{StaticResource MaterialIconButton}"
+                            TextColor="{StaticResource OnPrimary}"
+                            BackgroundColor="Transparent"
+                            Clicked="OnFamilyManagementClicked" />
+                    
+                    <Button Text="⚙️"
+                            Style="{StaticResource MaterialIconButton}"
+                            TextColor="{StaticResource OnPrimary}"
+                            BackgroundColor="Transparent"
+                            Clicked="OnSettingsClicked" />
+                    
+                </HorizontalStackLayout>
+                
+            </Grid>
+            
+        </Frame>
+
+        <!-- Lista de miembros de familia Material Design -->
+        <Frame Grid.Row="2" 
+               Style="{StaticResource MaterialCard}"
+               CornerRadius="16,16,0,0"
+               Padding="16">
+            
+            <VerticalStackLayout Spacing="16">
+                
+                <Label Text="Miembros de la Familia"
+                       Style="{StaticResource MaterialTitleMedium}"
+                       TextColor="{StaticResource Primary}"
+                       HorizontalOptions="Center" />
+                
+                <CollectionView x:Name="FamilyMembersCollection"
+                                ItemsLayout="HorizontalList"
+                                HeightRequest="120">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <controls:FamilyMemberCard LocationUpdate="{Binding}" 
+                                                       WidthRequest="160" />
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                
+                <Label Text="Desliza para ver más miembros"
+                       Style="{StaticResource MaterialBodySmall}"
+                       HorizontalOptions="Center"
+                       Opacity="0.7"
+                       IsVisible="{Binding Source={x:Reference FamilyMembersCollection}, Path=ItemsSource.Count, Converter={StaticResource CountToBoolConverter}}" />
+                
+            </VerticalStackLayout>
+            
+        </Frame>
+        
+    </Grid>
+
+</ContentPage>

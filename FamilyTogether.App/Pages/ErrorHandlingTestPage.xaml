@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.Pages.ErrorHandlingTestPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Error Handling Test">
+
+    <ScrollView Padding="20">
+        <StackLayout Spacing="15">
+            
+            <Label Text="Error Handling &amp; Reconnection Test"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   TextColor="{DynamicResource Primary}" />
+            
+            <Label Text="Use these tests to verify error handling and offline functionality."
+                   FontSize="14"
+                   TextColor="Gray"
+                   HorizontalOptions="Center" />
+            
+            <!-- Test Buttons -->
+            <Button Text="Test Network Connectivity"
+                    Clicked="OnTestConnectivityClicked"
+                    BackgroundColor="{DynamicResource Primary}" />
+            
+            <Button Text="Test Offline Storage"
+                    Clicked="OnTestOfflineStorageClicked"
+                    BackgroundColor="{DynamicResource Secondary}" />
+            
+            <Button Text="Test Retry Policy"
+                    Clicked="OnTestRetryPolicyClicked"
+                    BackgroundColor="{DynamicResource Tertiary}" />
+            
+            <Button Text="Test Error Classification"
+                    Clicked="OnTestErrorClassificationClicked"
+                    BackgroundColor="Orange" />
+            
+            <Button Text="Simulate Network Failure"
+                    Clicked="OnSimulateFailureClicked"
+                    BackgroundColor="Red"
+                    TextColor="White" />
+            
+            <Button Text="Get Status Report"
+                    Clicked="OnGetStatusReportClicked"
+                    BackgroundColor="Green"
+                    TextColor="White" />
+            
+            <Button Text="Clear Test Data"
+                    Clicked="OnClearTestDataClicked"
+                    BackgroundColor="Gray"
+                    TextColor="White" />
+            
+            <!-- Results Display -->
+            <Frame BackgroundColor="LightGray"
+                   Padding="15"
+                   CornerRadius="10">
+                <StackLayout>
+                    <Label Text="Test Results:"
+                           FontAttributes="Bold"
+                           FontSize="16" />
+                    <Label x:Name="ResultsLabel"
+                           Text="No tests run yet."
+                           FontFamily="Courier"
+                           FontSize="12"
+                           TextColor="Black" />
+                </StackLayout>
+            </Frame>
+            
+        </StackLayout>
+    </ScrollView>
+
+</ContentPage>

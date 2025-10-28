@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.Pages.JoinFamilyPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Unirse a Familia"
+             BackgroundColor="{DynamicResource Primary}">
+    
+    <ScrollView>
+        <VerticalStackLayout Spacing="30" Padding="30,50" VerticalOptions="Center">
+            
+            <!-- Título -->
+            <Label Text="Unirse a una Familia"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   TextColor="White"
+                   Margin="0,0,0,20" />
+            
+            <Label Text="Ingresa el código que te compartió un miembro de la familia"
+                   FontSize="16"
+                   HorizontalOptions="Center"
+                   TextColor="White"
+                   Opacity="0.9"
+                   HorizontalTextAlignment="Center"
+                   Margin="0,0,0,30" />
+
+            <!-- Formulario -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="15"
+                   Padding="30"
+                   HasShadow="True">
+                
+                <VerticalStackLayout Spacing="25">
+                    
+                    <Label Text="Código de Familia"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="{DynamicResource Primary}"
+                           HorizontalOptions="Center" />
+                    
+                    <Entry x:Name="FamilyCodeEntry"
+                           Placeholder="Ej: 550e8400-e29b-41d4-a716-446655440000"
+                           FontSize="14"
+                           HorizontalTextAlignment="Center"
+                           BackgroundColor="LightGray"
+                           TextColor="Black"
+                           MaxLength="36" />
+                    
+                    <Button Text="📋 Pegar desde Portapapeles"
+                            BackgroundColor="Transparent"
+                            TextColor="{DynamicResource Primary}"
+                            FontSize="14"
+                            Clicked="OnPasteClicked" />
+                    
+                    <Button x:Name="JoinButton"
+                            Text="Enviar Solicitud"
+                            BackgroundColor="{DynamicResource Primary}"
+                            TextColor="White"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            CornerRadius="25"
+                            HeightRequest="50"
+                            Clicked="OnJoinClicked" />
+                    
+                    <ActivityIndicator x:Name="LoadingIndicator"
+                                       IsVisible="False"
+                                       IsRunning="False"
+                                       Color="{DynamicResource Primary}" />
+                    
+                    <Label x:Name="StatusLabel"
+                           IsVisible="False"
+                           FontSize="14"
+                           HorizontalOptions="Center"
+                           HorizontalTextAlignment="Center" />
+                    
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Información -->
+            <Frame BackgroundColor="LightBlue" 
+                   CornerRadius="10"
+                   Padding="20"
+                   Opacity="0.9">
+                
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="ℹ️ ¿Cómo funciona?"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="DarkBlue"
+                           HorizontalOptions="Center" />
+                    <Label Text="1. Un miembro de la familia te comparte el código"
+                           FontSize="14"
+                           TextColor="DarkBlue" />
+                    <Label Text="2. Ingresas el código y envías la solicitud"
+                           FontSize="14"
+                           TextColor="DarkBlue" />
+                    <Label Text="3. Un administrador de la familia aprueba tu solicitud"
+                           FontSize="14"
+                           TextColor="DarkBlue" />
+                    <Label Text="4. ¡Ya puedes ver la ubicación de tu familia!"
+                           FontSize="14"
+                           TextColor="DarkBlue" />
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Botón de cancelar -->
+            <Button Text="Cancelar"
+                    BackgroundColor="Transparent"
+                    TextColor="White"
+                    FontSize="16"
+                    CornerRadius="25"
+                    HeightRequest="50"
+                    BorderColor="White"
+                    BorderWidth="1"
+                    Clicked="OnCancelClicked" />
+            
+        </VerticalStackLayout>
+    </ScrollView>
+    
+</ContentPage>

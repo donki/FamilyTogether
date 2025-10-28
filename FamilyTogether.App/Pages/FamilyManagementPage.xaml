@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.Pages.FamilyManagementPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Mi Familia">
+    
+    <ScrollView>
+        <VerticalStackLayout Spacing="20" Padding="20">
+            
+            <!-- Información de la familia Material Design -->
+            <Frame Style="{StaticResource MaterialElevatedCard}"
+                   BackgroundColor="{StaticResource PrimaryContainer}"
+                   x:Name="FamilyInfoFrame"
+                   IsVisible="False">
+                
+                <VerticalStackLayout Spacing="16">
+                    <Label x:Name="FamilyNameLabel"
+                           Style="{StaticResource MaterialTitleLarge}"
+                           TextColor="{StaticResource OnPrimaryContainer}"
+                           HorizontalOptions="Center" />
+                    
+                    <Frame BackgroundColor="{StaticResource Surface}"
+                           CornerRadius="8"
+                           Padding="12"
+                           HasShadow="False">
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+                            <Label Text="Código:"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSurface}" />
+                            <Label x:Name="FamilyCodeLabel"
+                                   Style="{StaticResource MaterialLabelLarge}"
+                                   TextColor="{StaticResource Primary}" />
+                            <Button Text="📋"
+                                    Style="{StaticResource MaterialIconButton}"
+                                    WidthRequest="32"
+                                    HeightRequest="32"
+                                    FontSize="14"
+                                    Clicked="OnCopyCodeClicked" />
+                        </HorizontalStackLayout>
+                    </Frame>
+                    
+                    <Button Text="Compartir Código"
+                            Style="{StaticResource MaterialFilledButton}"
+                            BackgroundColor="{StaticResource OnPrimaryContainer}"
+                            TextColor="{StaticResource PrimaryContainer}"
+                            Clicked="OnShareCodeClicked" />
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Miembros de la familia Material Design -->
+            <Frame Style="{StaticResource MaterialCard}"
+                   x:Name="MembersFrame"
+                   IsVisible="False">
+                
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Miembros de la Familia"
+                           Style="{StaticResource MaterialTitleMedium}"
+                           TextColor="{StaticResource Primary}"
+                           HorizontalOptions="Center" />
+                    
+                    <CollectionView x:Name="MembersCollectionView"
+                                    ItemsSource="{Binding Members}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Frame Style="{StaticResource MaterialCard}"
+                                       Margin="0,4"
+                                       Padding="16,12">
+                                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto,Auto">
+                                        
+                                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                            <Label Text="{Binding Name}"
+                                                   Style="{StaticResource MaterialBodyLarge}"
+                                                   FontAttributes="Bold" />
+                                            <Label Text="{Binding Email}"
+                                                   Style="{StaticResource MaterialBodySmall}" />
+                                            <HorizontalStackLayout Spacing="8">
+                                                <Frame BackgroundColor="{StaticResource SecondaryContainer}"
+                                                       CornerRadius="8"
+                                                       Padding="6,2"
+                                                       HasShadow="False">
+                                                    <Label Text="{Binding Status}"
+                                                           Style="{StaticResource MaterialBodySmall}"
+                                                           TextColor="{StaticResource OnSecondaryContainer}" />
+                                                </Frame>
+                                                <Frame BackgroundColor="{StaticResource ErrorContainer}"
+                                                       CornerRadius="8"
+                                                       Padding="6,2"
+                                                       HasShadow="False"
+                                                       IsVisible="{Binding IsAdmin}">
+                                                    <Label Text="Admin"
+                                                           Style="{StaticResource MaterialBodySmall}"
+                                                           TextColor="{StaticResource OnErrorContainer}" />
+                                                </Frame>
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+                                        
+                                        <Button Grid.Column="1"
+                                                Text="✅"
+                                                Style="{StaticResource MaterialIconButton}"
+                                                BackgroundColor="{StaticResource Tertiary}"
+                                                TextColor="{StaticResource OnTertiary}"
+                                                IsVisible="{Binding IsPending}"
+                                                CommandParameter="{Binding UserId}"
+                                                Clicked="OnApproveMemberClicked" />
+                                        
+                                        <Button Grid.Column="2"
+                                                Text="❌"
+                                                Style="{StaticResource MaterialIconButton}"
+                                                BackgroundColor="{StaticResource Error}"
+                                                TextColor="{StaticResource OnError}"
+                                                CommandParameter="{Binding UserId}"
+                                                Clicked="OnRemoveMemberClicked" />
+                                        
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Acciones cuando no hay familia Material Design -->
+            <VerticalStackLayout x:Name="NoFamilyLayout" 
+                                 Spacing="24"
+                                 IsVisible="True">
+                
+                <VerticalStackLayout Spacing="16" Margin="0,48,0,32">
+                    <Label Text="👨‍👩‍👧‍👦"
+                           FontSize="64"
+                           HorizontalOptions="Center"
+                           Opacity="0.6" />
+                    <Label Text="No perteneces a ninguna familia"
+                           Style="{StaticResource MaterialHeadlineSmall}"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource OnSurfaceVariant}"
+                           HorizontalTextAlignment="Center" />
+                    <Label Text="Crea una nueva familia o únete a una existente para comenzar"
+                           Style="{StaticResource MaterialBodyMedium}"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource OnSurfaceVariant}"
+                           HorizontalTextAlignment="Center"
+                           Opacity="0.8" />
+                </VerticalStackLayout>
+                
+                <Button Text="Crear Nueva Familia"
+                        Style="{StaticResource MaterialFilledButton}"
+                        Clicked="OnCreateFamilyClicked" />
+                
+                <Button Text="Unirse a Familia"
+                        Style="{StaticResource MaterialOutlinedButton}"
+                        Clicked="OnJoinFamilyClicked" />
+                
+            </VerticalStackLayout>
+
+            <!-- Loading indicator -->
+            <ActivityIndicator x:Name="LoadingIndicator"
+                               IsVisible="False"
+                               IsRunning="False"
+                               Color="{DynamicResource Primary}"
+                               HeightRequest="50" />
+            
+        </VerticalStackLayout>
+    </ScrollView>
+    
+</ContentPage>

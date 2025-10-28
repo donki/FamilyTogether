@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.Pages.RegisterPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Registro"
+             BackgroundColor="{DynamicResource Primary}">
+    
+    <ScrollView>
+        <VerticalStackLayout Spacing="25" Padding="30,0" VerticalOptions="Center">
+            
+            <!-- Título -->
+            <Label Text="Crear Cuenta"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   TextColor="White"
+                   Margin="0,40,0,20" />
+            
+            <Label Text="Únete a FamilyTogether"
+                   FontSize="16"
+                   HorizontalOptions="Center"
+                   TextColor="White"
+                   Opacity="0.8"
+                   Margin="0,0,0,40" />
+
+            <!-- Formulario de registro -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="15"
+                   Padding="20"
+                   HasShadow="True">
+                
+                <VerticalStackLayout Spacing="20">
+                    
+                    <Entry x:Name="NameEntry"
+                           Placeholder="Nombre completo"
+                           FontSize="16"
+                           BackgroundColor="Transparent" />
+                    
+                    <Entry x:Name="EmailEntry"
+                           Placeholder="Correo electrónico"
+                           Keyboard="Email"
+                           FontSize="16"
+                           BackgroundColor="Transparent" />
+                    
+                    <Entry x:Name="PasswordEntry"
+                           Placeholder="Contraseña (mínimo 6 caracteres)"
+                           IsPassword="True"
+                           FontSize="16"
+                           BackgroundColor="Transparent" />
+                    
+                    <Entry x:Name="ConfirmPasswordEntry"
+                           Placeholder="Confirmar contraseña"
+                           IsPassword="True"
+                           FontSize="16"
+                           BackgroundColor="Transparent" />
+                    
+                    <Button x:Name="RegisterButton"
+                            Text="Crear Cuenta"
+                            BackgroundColor="{DynamicResource Primary}"
+                            TextColor="White"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            CornerRadius="25"
+                            HeightRequest="50"
+                            Clicked="OnRegisterClicked" />
+                    
+                    <ActivityIndicator x:Name="LoadingIndicator"
+                                       IsVisible="False"
+                                       IsRunning="False"
+                                       Color="{DynamicResource Primary}" />
+                    
+                    <Label x:Name="ErrorLabel"
+                           IsVisible="False"
+                           TextColor="Red"
+                           FontSize="14"
+                           HorizontalOptions="Center" />
+                    
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Login -->
+            <StackLayout Orientation="Horizontal" 
+                         HorizontalOptions="Center"
+                         Margin="0,20,0,0">
+                <Label Text="¿Ya tienes cuenta?"
+                       TextColor="White"
+                       FontSize="14" />
+                <Label Text="Inicia sesión"
+                       TextColor="White"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextDecorations="Underline">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnLoginTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </StackLayout>
+            
+        </VerticalStackLayout>
+    </ScrollView>
+    
+</ContentPage>

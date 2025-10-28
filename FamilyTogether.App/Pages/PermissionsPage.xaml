@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.Pages.PermissionsPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Permisos Requeridos"
+             BackgroundColor="{DynamicResource Primary}">
+    
+    <ScrollView>
+        <VerticalStackLayout Spacing="30" Padding="30,20">
+            
+            <!-- Título Material Design -->
+            <VerticalStackLayout Spacing="16" Margin="0,32,0,24">
+                <Label Text="🔐"
+                       FontSize="48"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource OnPrimary}" />
+                <Label Text="Configuración de Permisos"
+                       Style="{StaticResource MaterialHeadlineMedium}"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource OnPrimary}" />
+                
+                <Label Text="Para funcionar correctamente, FamilyTogether necesita los siguientes permisos:"
+                       Style="{StaticResource MaterialBodyLarge}"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource OnPrimary}"
+                       Opacity="0.9"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <!-- Permisos de ubicación Material Design -->
+            <Frame Style="{StaticResource MaterialElevatedCard}">
+                
+                <VerticalStackLayout Spacing="16">
+                    
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                        <Ellipse Grid.Column="0"
+                                 Fill="{StaticResource PrimaryContainer}"
+                                 WidthRequest="48"
+                                 HeightRequest="48" />
+                        <Label Grid.Column="0"
+                               Text="📍"
+                               FontSize="24"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                        
+                        <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                            <Label Text="Ubicación"
+                                   Style="{StaticResource MaterialTitleMedium}"
+                                   TextColor="{StaticResource Primary}" />
+                            <Label Text="Necesario para compartir tu ubicación con la familia"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSurfaceVariant}" />
+                        </VerticalStackLayout>
+                        
+                        <Label Grid.Column="2"
+                               x:Name="LocationStatusLabel"
+                               Text="❌"
+                               FontSize="24"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    
+                    <Button x:Name="LocationPermissionButton"
+                            Text="Conceder Permiso de Ubicación"
+                            Style="{StaticResource MaterialFilledButton}"
+                            Clicked="OnLocationPermissionClicked" />
+                    
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Optimización de batería Material Design -->
+            <Frame Style="{StaticResource MaterialElevatedCard}">
+                
+                <VerticalStackLayout Spacing="16">
+                    
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                        <Ellipse Grid.Column="0"
+                                 Fill="{StaticResource WarningContainer}"
+                                 WidthRequest="48"
+                                 HeightRequest="48" />
+                        <Label Grid.Column="0"
+                               Text="🔋"
+                               FontSize="24"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                        
+                        <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                            <Label Text="Optimización de Batería"
+                                   Style="{StaticResource MaterialTitleMedium}"
+                                   TextColor="{StaticResource Warning}" />
+                            <Label Text="Permite que la app funcione en segundo plano"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSurfaceVariant}" />
+                        </VerticalStackLayout>
+                        
+                        <Label Grid.Column="2"
+                               x:Name="BatteryStatusLabel"
+                               Text="❌"
+                               FontSize="24"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    
+                    <Button x:Name="BatteryOptimizationButton"
+                            Text="Desactivar Optimización"
+                            Style="{StaticResource MaterialFilledButton}"
+                            BackgroundColor="{StaticResource Warning}"
+                            TextColor="{StaticResource OnWarning}"
+                            Clicked="OnBatteryOptimizationClicked" />
+                    
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Información adicional Material Design -->
+            <Frame Style="{StaticResource MaterialCard}"
+                   BackgroundColor="{StaticResource SecondaryContainer}">
+                
+                <VerticalStackLayout Spacing="12">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="ℹ️"
+                               FontSize="20" />
+                        <Label Text="Información Importante"
+                               Style="{StaticResource MaterialTitleMedium}"
+                               TextColor="{StaticResource OnSecondaryContainer}" />
+                    </HorizontalStackLayout>
+                    
+                    <VerticalStackLayout Spacing="8">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="•"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSecondaryContainer}" />
+                            <Label Text="Los permisos de ubicación son necesarios para el funcionamiento básico"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSecondaryContainer}"
+                                   HorizontalOptions="FillAndExpand" />
+                        </HorizontalStackLayout>
+                        
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="•"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSecondaryContainer}" />
+                            <Label Text="La exclusión de optimización de batería mejora la precisión"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSecondaryContainer}"
+                                   HorizontalOptions="FillAndExpand" />
+                        </HorizontalStackLayout>
+                        
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="•"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSecondaryContainer}" />
+                            <Label Text="Puedes cambiar estos permisos en cualquier momento desde Configuración"
+                                   Style="{StaticResource MaterialBodyMedium}"
+                                   TextColor="{StaticResource OnSecondaryContainer}"
+                                   HorizontalOptions="FillAndExpand" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Botones de acción Material Design -->
+            <VerticalStackLayout Spacing="16" Margin="0,32,0,0">
+                
+                <Button x:Name="ContinueButton"
+                        Text="Continuar"
+                        Style="{StaticResource MaterialFilledButton}"
+                        BackgroundColor="{StaticResource OnPrimary}"
+                        TextColor="{StaticResource Primary}"
+                        IsEnabled="False"
+                        Clicked="OnContinueClicked" />
+                
+                <Button x:Name="SkipButton"
+                        Text="Configurar Después"
+                        Style="{StaticResource MaterialOutlinedButton}"
+                        TextColor="{StaticResource OnPrimary}"
+                        BorderColor="{StaticResource OnPrimary}"
+                        Clicked="OnSkipClicked" />
+                
+            </VerticalStackLayout>
+            
+        </VerticalStackLayout>
+    </ScrollView>
+    
+</ContentPage>

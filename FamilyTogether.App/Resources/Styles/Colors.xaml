@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary 
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Material Design 3 Color Palette for Family App -->
+    
+    <!-- Primary Colors - Family Blue Theme -->
+    <Color x:Key="Primary">#1976D2</Color>
+    <Color x:Key="PrimaryContainer">#E3F2FD</Color>
+    <Color x:Key="OnPrimary">#FFFFFF</Color>
+    <Color x:Key="OnPrimaryContainer">#0D47A1</Color>
+    
+    <!-- Secondary Colors - Warm Accent -->
+    <Color x:Key="Secondary">#FF7043</Color>
+    <Color x:Key="SecondaryContainer">#FFF3E0</Color>
+    <Color x:Key="OnSecondary">#FFFFFF</Color>
+    <Color x:Key="OnSecondaryContainer">#E65100</Color>
+    
+    <!-- Tertiary Colors - Success Green -->
+    <Color x:Key="Tertiary">#4CAF50</Color>
+    <Color x:Key="TertiaryContainer">#E8F5E8</Color>
+    <Color x:Key="OnTertiary">#FFFFFF</Color>
+    <Color x:Key="OnTertiaryContainer">#1B5E20</Color>
+    
+    <!-- Error Colors -->
+    <Color x:Key="Error">#F44336</Color>
+    <Color x:Key="ErrorContainer">#FFEBEE</Color>
+    <Color x:Key="OnError">#FFFFFF</Color>
+    <Color x:Key="OnErrorContainer">#C62828</Color>
+    
+    <!-- Warning Colors -->
+    <Color x:Key="Warning">#FF9800</Color>
+    <Color x:Key="WarningContainer">#FFF8E1</Color>
+    <Color x:Key="OnWarning">#FFFFFF</Color>
+    <Color x:Key="OnWarningContainer">#E65100</Color>
+    
+    <!-- Surface Colors -->
+    <Color x:Key="Surface">#FAFAFA</Color>
+    <Color x:Key="SurfaceVariant">#F5F5F5</Color>
+    <Color x:Key="OnSurface">#212121</Color>
+    <Color x:Key="OnSurfaceVariant">#424242</Color>
+    
+    <!-- Background Colors -->
+    <Color x:Key="Background">#FFFFFF</Color>
+    <Color x:Key="OnBackground">#212121</Color>
+    
+    <!-- Outline Colors -->
+    <Color x:Key="Outline">#E0E0E0</Color>
+    <Color x:Key="OutlineVariant">#EEEEEE</Color>
+    
+    <!-- Legacy Colors for Compatibility -->
+    <Color x:Key="PrimaryDark">#0D47A1</Color>
+    <Color x:Key="PrimaryDarkText">#FFFFFF</Color>
+    <Color x:Key="SecondaryDarkText">#E65100</Color>
+    
+    <Color x:Key="White">#FFFFFF</Color>
+    <Color x:Key="Black">#000000</Color>
+    <Color x:Key="MidnightBlue">#0D47A1</Color>
+    <Color x:Key="OffBlack">#212121</Color>
+
+    <!-- Neutral Colors -->
+    <Color x:Key="Gray50">#FAFAFA</Color>
+    <Color x:Key="Gray100">#F5F5F5</Color>
+    <Color x:Key="Gray200">#EEEEEE</Color>
+    <Color x:Key="Gray300">#E0E0E0</Color>
+    <Color x:Key="Gray400">#BDBDBD</Color>
+    <Color x:Key="Gray500">#9E9E9E</Color>
+    <Color x:Key="Gray600">#757575</Color>
+    <Color x:Key="Gray700">#616161</Color>
+    <Color x:Key="Gray800">#424242</Color>
+    <Color x:Key="Gray900">#212121</Color>
+    <Color x:Key="Gray950">#121212</Color>
+
+    <!-- Material Design Brushes -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
+    <SolidColorBrush x:Key="PrimaryContainerBrush" Color="{StaticResource PrimaryContainer}"/>
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
+    <SolidColorBrush x:Key="SecondaryContainerBrush" Color="{StaticResource SecondaryContainer}"/>
+    <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
+    <SolidColorBrush x:Key="TertiaryContainerBrush" Color="{StaticResource TertiaryContainer}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Error}"/>
+    <SolidColorBrush x:Key="ErrorContainerBrush" Color="{StaticResource ErrorContainer}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
+    <SolidColorBrush x:Key="WarningContainerBrush" Color="{StaticResource WarningContainer}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource Surface}"/>
+    <SolidColorBrush x:Key="SurfaceVariantBrush" Color="{StaticResource SurfaceVariant}"/>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource Background}"/>
+    <SolidColorBrush x:Key="OutlineBrush" Color="{StaticResource Outline}"/>
+    
+    <!-- Legacy Brushes -->
+    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
+    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+    <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}"/>
+    <SolidColorBrush x:Key="Gray200Brush" Color="{StaticResource Gray200}"/>
+    <SolidColorBrush x:Key="Gray300Brush" Color="{StaticResource Gray300}"/>
+    <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
+    <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
+    <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
+    <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
+    <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+</ResourceDictionary>

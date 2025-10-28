@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="FamilyTogether.App.Pages.LoginPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="FamilyTogether"
+             BackgroundColor="{DynamicResource Primary}">
+    
+    <ScrollView>
+        <VerticalStackLayout Spacing="32" Padding="24,0" VerticalOptions="Center">
+            
+            <!-- Logo y título -->
+            <VerticalStackLayout Spacing="16" x:Name="HeaderSection" Margin="0,40,0,48">
+                <Ellipse Fill="{StaticResource OnPrimary}" 
+                         WidthRequest="120" 
+                         HeightRequest="120"
+                         HorizontalOptions="Center">
+                    <Ellipse.Shadow>
+                        <Shadow Brush="{StaticResource OnPrimary}" 
+                                Opacity="0.3" 
+                                Radius="16" 
+                                Offset="0,4" />
+                    </Ellipse.Shadow>
+                </Ellipse>
+                
+                <Label Text="👨‍👩‍👧‍👦" 
+                       FontSize="48"
+                       HorizontalOptions="Center"
+                       Margin="0,-90,0,0" />
+                
+                <Label Text="FamilyTogether"
+                       Style="{StaticResource MaterialHeadlineLarge}"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource OnPrimary}"
+                       Margin="0,16,0,0" />
+                
+                <Label Text="Mantente conectado con tu familia"
+                       Style="{StaticResource MaterialBodyLarge}"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource OnPrimary}"
+                       Opacity="0.9"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <!-- Formulario de login -->
+            <Frame Style="{StaticResource MaterialElevatedCard}" 
+                   x:Name="LoginCard"
+                   Margin="0,0,0,24">
+                
+                <VerticalStackLayout Spacing="24">
+                    
+                    <Label Text="Iniciar Sesión"
+                           Style="{StaticResource MaterialTitleLarge}"
+                           HorizontalOptions="Center"
+                           TextColor="{StaticResource Primary}"
+                           Margin="0,0,0,8" />
+                    
+                    <VerticalStackLayout Spacing="16">
+                        <Entry x:Name="EmailEntry"
+                               Placeholder="Correo electrónico"
+                               Keyboard="Email"
+                               Style="{StaticResource MaterialEntry}" />
+                        
+                        <Entry x:Name="PasswordEntry"
+                               Placeholder="Contraseña"
+                               IsPassword="True"
+                               Style="{StaticResource MaterialEntry}" />
+                    </VerticalStackLayout>
+                    
+                    <Button x:Name="LoginButton"
+                            Text="Iniciar Sesión"
+                            Style="{StaticResource MaterialFilledButton}"
+                            Clicked="OnLoginClicked" />
+                    
+                    <ActivityIndicator x:Name="LoadingIndicator"
+                                       IsVisible="False"
+                                       IsRunning="False"
+                                       Color="{StaticResource Primary}"
+                                       HeightRequest="32" />
+                    
+                    <Frame x:Name="ErrorFrame"
+                           IsVisible="False"
+                           BackgroundColor="{StaticResource ErrorContainer}"
+                           CornerRadius="8"
+                           Padding="12,8"
+                           HasShadow="False">
+                        <Label x:Name="ErrorLabel"
+                               TextColor="{StaticResource OnErrorContainer}"
+                               Style="{StaticResource MaterialBodyMedium}"
+                               HorizontalOptions="Center" />
+                    </Frame>
+                    
+                </VerticalStackLayout>
+                
+            </Frame>
+
+            <!-- Registro -->
+            <StackLayout Orientation="Horizontal" 
+                         HorizontalOptions="Center"
+                         Spacing="8"
+                         x:Name="RegisterSection">
+                <Label Text="¿No tienes cuenta?"
+                       TextColor="{StaticResource OnPrimary}"
+                       Style="{StaticResource MaterialBodyMedium}"
+                       Opacity="0.9" />
+                <Button Text="Regístrate"
+                        Style="{StaticResource MaterialTextButton}"
+                        TextColor="{StaticResource OnPrimary}"
+                        BackgroundColor="Transparent"
+                        Padding="8,4">
+                    <Button.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnRegisterTapped" />
+                    </Button.GestureRecognizers>
+                </Button>
+            </StackLayout>
+            
+        </VerticalStackLayout>
+    </ScrollView>
+    
+</ContentPage>
