@@ -101,6 +101,11 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   admita vincular con id_token.
 - **Solo el último móvil comparte**: al recuperar, el usuario viejo se borra y su móvil deja de poder escribir.
 - **Retención 30 días.**
+- **FR-010 matizado (2026-09-27)**: dentro de casa la ubicación por red da unos 100 m y con 25 m
+  estrictos el grupo no veía a nadie en interiores. Si en 10 minutos no hay ninguna lectura de 25 m
+  o mejor, se envía la mejor que haya (hasta 100 m) marcada como aproximada (`positions.coarse`):
+  actualiza la última posición del mapa pero no entra en el historial ni en las zonas.
+- **Al abrir, el mapa se centra en mi posición** (punto azul con su precisión), no en todo el grupo.
 - **Mapa** con MapLibre GL JS 4.7.1 **empaquetado** en la app (Hiker lo carga de unpkg: aquí no).
 - Detalle técnico en [ARQUITECTURA.md](ARQUITECTURA.md).
 

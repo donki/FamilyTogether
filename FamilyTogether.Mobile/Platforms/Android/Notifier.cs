@@ -203,7 +203,8 @@ public sealed class Notifier : INotifier
 
     /// <summary>
     /// Al tocar el aviso se abre la app en ese grupo y evento: <see cref="MainActivity"/> recibe
-    /// <c>familytogether://event?type=…&amp;group=…&amp;event=…</c> y se lo pasa a
+    /// <c>familytogether://event?type=…&amp;group=…&amp;event=…</c> (con <c>&amp;lat=…&amp;lon=…</c> si el
+    /// aviso trae sitio) y se lo pasa a
     /// <c>App.HandleDeepLink</c>. PendingIntent inmutable (obligatorio desde Android 12).
     /// </summary>
     private static PendingIntent? OpenAppIntent(Context context, NotificationContent content, int requestCode)
@@ -211,6 +212,10 @@ public sealed class Notifier : INotifier
         var link = $"{MainActivity.DeepLinkScheme}://event" +
                    $"?type={Uri.EscapeDataString(content.EventType ?? string.Empty)}" +
                    $"&group={content.GroupId:D}&event={content.EventId:D}";
+
+        // SOS y zonas: el mapa se centra en el sitio del aviso en vez de enseñar todo el grupo.
+        if (content is { Lat: { } lat, Lon: { } lon })
+            link += FormattableString.Invariant($"&lat={lat:R}&lon={lon:R}");
 
         var intent = new Intent(context, typeof(MainActivity));
         intent.SetAction(Intent.ActionView);
