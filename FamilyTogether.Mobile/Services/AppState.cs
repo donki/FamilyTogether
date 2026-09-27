@@ -11,6 +11,7 @@ public static class AppState
     private const string KeyGuideDone = "guide_done";
     private const string KeyLastVersion = "last_version_seen";
     private const string KeySelectedGroup = "selected_group";
+    private const string KeySnapTracks = "snap_tracks";
 
     public static bool WelcomeDone
     {
@@ -35,6 +36,16 @@ public static class AppState
     {
         get => Guid.TryParse(Get(KeySelectedGroup, string.Empty), out var g) ? g : Guid.Empty;
         set => Set(KeySelectedGroup, value == Guid.Empty ? string.Empty : value.ToString("D"));
+    }
+
+    /// <summary>
+    /// Ajustar los recorridos del historial a calles y caminos (pide a Overpass la red por
+    /// teselas fijas, nunca el recorrido). Encendido por defecto.
+    /// </summary>
+    public static bool SnapTracks
+    {
+        get => Get(KeySnapTracks, true);
+        set => Set(KeySnapTracks, value);
     }
 
     /// <summary>Hay una version instalada distinta de la ultima cuyas novedades se enseñaron.</summary>

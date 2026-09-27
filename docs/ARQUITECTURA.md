@@ -51,6 +51,12 @@ Sin SDK de Supabase: PostgREST (`/rest/v1`) y GoTrue (`/auth/v1`) con `HttpClien
 - **Qué se cifra con la clave del grupo**: nombre del grupo, nombre visible y avatar (PNG 96×96 en
   base64) del miembro, nombre y geometría de la zona, coordenadas de cada posición, contenido del SOS.
   En claro: identificadores, fechas, batería, rol, pausa, código de invitación.
+- **Regla (Josep, 2026-09-27): todo texto va cifrado.** Cualquier cosa nueva que se guarde en el
+  servidor —una tabla, una columna, un registro de borrado, un motivo— que sea texto o coordenadas
+  se cifra con la clave del grupo (`enc1:`); ninguna RPC ni tabla recibe texto ni coordenadas en
+  claro. Lo que se guarda en el móvil y sale de datos del usuario (p. ej. un recorrido ajustado, si
+  algún día se guardara) se trata como el resto de datos locales; la caché de teselas de
+  OpenStreetMap (§10) no es dato del usuario.
 - **Cargas JSON** antes de cifrar (claves cortas, invariantes, `CultureInfo.InvariantCulture`):
   - posición: `{"lat":40.1,"lon":-3.2,"acc":8.5}`
   - zona: `{"lat":40.1,"lon":-3.2,"r":150}`
@@ -131,6 +137,7 @@ y la app traduce la clave: `not_member`, `not_admin`, `expired`, `not_found`, `a
 | `create_sos(p_id uuid, p_targets jsonb)` | `void` | `p_targets` = `[{"group_id":"…","payload_enc":"enc1:…"}]`; solo grupos donde es miembro (**aunque esté en pausa**); idempotente por `p_id` |
 | `report_zone_event(p_id uuid, p_group uuid, p_zone uuid, p_kind text)` | `void` | miembro que comparte; idempotente |
 | `transfer_user(p_old uuid, p_new uuid)` | `void` | **solo service_role** (revocada a `anon`/`authenticated`) |
+| `clear_my_history()` | `integer` | borra **mis** `positions` en todos mis grupos y devuelve cuántas; conserva `last_positions` (el mapa me sigue viendo). Sin parámetros: el usuario sale de `auth.uid()` y no hay forma de apuntar a otro. `positions` sigue sin `DELETE` para `authenticated`. No recibe texto (`06_clear_history.sql`) |
 
 ### Precisiones del servidor (2026-09-27, probadas en `supabase/tests/prueba_local.sql`)
 
@@ -251,6 +258,7 @@ public sealed class FamilyService       // lo que llama la interfaz
     Task FulfillPendingKeySharesAsync();    // entrega claves a quien las pida; lo llaman la app y el servicio
     Task RequestMissingKeysAsync();         // tras recuperar la cuenta
     Task RegisterPushTokenAsync(string token);
+    Task<int> ClearMyHistoryAsync();        // clear_my_history; desde la app, por LocationOutbox.ClearHistoryAsync
 }
 
 public sealed class LocationOutbox      // SQLite (sqlite-net-pcl): cola de posiciones y de SOS
@@ -258,7 +266,15 @@ public sealed class LocationOutbox      // SQLite (sqlite-net-pcl): cola de posi
     Task EnqueueAsync(double lat, double lon, double accuracy, int battery, DateTimeOffset at, IReadOnlyList<Guid> sharingGroups);
     Task<int> FlushAsync(FamilyService service);     // cifra por grupo e inserta; devuelve cuántas envió
     Task<int> PendingCountAsync();
+    Task<int> ClearHistoryAsync(FamilyService service); // servidor y, si sale bien, la cola menos la lectura más reciente
 }
+
+// Historial por las calles (§10)
+public readonly record struct TrackPoint(double Lat, double Lon, double Accuracy);
+public sealed record MatchedTrack(IReadOnlyList<GeoPoint> Line, int MatchedPoints, int PointCount);
+public sealed class OsmRoadSource { Task<RoadFetch> GetAsync(IReadOnlyList<TrackPoint> points); }  // teselas fijas + caché
+public static class TrackMatcher { MatchedTrack Match(RoadNetwork network, IReadOnlyList<TrackPoint> points); }
+public sealed class TrackSnapper { Task<Result> SnapAsync(IReadOnlyList<TrackPoint> points); }      // nunca lanza por la red
 
 public sealed class SosService
 {
@@ -282,3 +298,46 @@ public sealed class AccountService      // vincular y recuperar
 ```
 
 Los textos visibles de los avisos los monta la app con su localización a partir de `NotificationContent`.
+
+## 10. Historial: borrar el mío y dibujarlo por las calles (2026-09-27)
+
+### Borrar mi historial
+
+- Ajustes («Historial» → «Borrar mi historial») y la papelera de la barra de Historial, con
+  confirmación. `LocationOutbox.ClearHistoryAsync` toma el cerrojo del envío, llama a
+  `clear_my_history` y, solo si sale bien, borra la cola local **menos la lectura más reciente**
+  (será la última posición del mapa, como la que conserva el servidor). Si el servidor falla, no se
+  toca nada.
+- Se conserva la última posición de cada grupo (`last_positions`): el mapa te sigue viendo, pero el
+  historial queda vacío. Nadie puede borrar el de otro: la RPC no tiene parámetros y un `DELETE`
+  directo sobre `positions` lo rechaza el servidor (probado en `IntegrationTests`).
+
+### Recorridos por las calles (solo dibujo, en el móvil)
+
+- **Privacidad**: las coordenadas del recorrido **no salen del móvil**. A Overpass
+  (`overpass-api.de`, `overpass.kumi.systems`, los de Hiker) solo se le pide la red de **teselas
+  fijas** de una rejilla de 0,02° (`RoadTile`) que toca el recorrido (con ~100 m de margen por
+  posición): `way["highway"~"…"](s,w,n,e);out skel geom qt;`. Nada de servicios de rutas (OSRM,
+  GraphHopper) con la traza.
+- **Qué vías**: autopistas a pistas, calles, `service`, peatonales, `footway`, `path`, `cycleway`,
+  `bridleway`, `steps`; fuera obras, proyectos, abandonadas, andenes, circuitos y pasillos. Sentido
+  único ignorado (es para dibujar; andando se recorren en los dos).
+- **Caché** (`OsmRoadSource`): un fichero por tesela en `FileSystem.CacheDirectory/roads`
+  (formato compacto propio), válido 30 días, máximo 150 teselas (se borran las más viejas); una
+  caducada que no se puede renovar se usa igual. Máximo **24 teselas por recorrido** (las que más
+  posiciones tienen); las demás cuentan como «faltan» y la app lo dice. Dos peticiones a la vez;
+  429 o fallo → el siguiente servidor; si fallan todos, 2 minutos sin preguntar. Respuesta con
+  `remark` de error → no se guarda (sería una red a medias).
+- **Ajuste** (`TrackMatcher`, HMM + Viterbi, Newson y Krumm): candidatos = proyección en las
+  aristas a menos de `clamp(3σ + 10, 25, 80)` m (σ = precisión, 5–25 m), como mucho 6; emisión
+  gaussiana en la distancia; transición `−|red − recta| / 25 m`; entre dos elegidos, el camino más
+  corto (Dijkstra acotado). **Nunca un rodeo**: si por la red hay más de `2 × recta + 150 m`, o más
+  de 2 km en recta entre dos posiciones, o una posición no tiene calles cerca, ese tramo va recto.
+- **Interfaz**: se dibuja recto al momento; si el interruptor de Ajustes está encendido (lo está
+  por defecto) se ajusta en segundo plano y se redibuja, con una línea de estado (ajustado, en parte,
+  o sin mapa). Sin mapa, recto como antes y sin diálogos. **El recorrido ajustado no se guarda** ni
+  en el servidor ni en el móvil.
+- Referencia de rendimiento (PC): una tesela del centro de Madrid (1,7 MB de Overpass, 590 KB en
+  caché, 11 500 nodos) se lee y monta en ~40 ms y 283 posiciones se ajustan en ~0,3 s con 0,9 m de
+  error medio; la primera vez manda la descarga (~6 s por tesela urbana).
+

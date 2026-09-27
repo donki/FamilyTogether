@@ -1,5 +1,17 @@
 # Changelog — Family Together
 
+## 2026.09.27.03
+
+- **Historial por las calles**: el recorrido de un día se ajusta en el móvil a la red de calles y
+  caminos de OpenStreetMap (map matching HMM/Viterbi y camino más corto entre posiciones). A
+  Overpass solo se le piden teselas fijas de 0,02° (nunca el recorrido), guardadas 30 días en la
+  caché. Lo que no encaja se queda recto; sin mapa, como antes. Interruptor en Ajustes, encendido
+  por defecto.
+- **Borrar mi historial** (Ajustes y papelera de Historial): RPC `clear_my_history`
+  (`06_clear_history.sql`) que borra solo las posiciones propias en todos los grupos y conserva la
+  última de cada grupo en el mapa; también vacía la cola local salvo la lectura más reciente.
+- Política de privacidad y textos de la app al día.
+
 ## 2026.09.27.00 — Primera versión (en desarrollo)
 
 - Grupos cerrados: crear, invitar con código o QR (5 minutos), unirse con aprobación de un

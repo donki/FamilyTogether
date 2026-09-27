@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.09.27.03",
+    "date": "2026-09-27",
+    "es": [
+      "Los recorridos del historial siguen las calles y caminos en vez de ir en línea recta. El ajuste se hace en tu móvil: a OpenStreetMap solo se le pide el mapa de calles de la zona, nunca tu recorrido. Se puede apagar en Ajustes.",
+      "Borrar mi historial: en Ajustes o con la papelera de Historial borras tus recorridos en todos tus grupos. Tus grupos siguen viendo tu última posición en el mapa."
+    ],
+    "en": [
+      "History routes follow streets and paths instead of straight lines. The snapping happens on your phone: OpenStreetMap is only asked for the street map of the area, never your route. You can turn it off in Settings.",
+      "Delete my history: in Settings or with the bin in History you delete your routes in all your groups. Your groups still see your last position on the map."
+    ]
+  },
+  {
     "version": "2026.09.27.00",
     "date": "2026-09-27",
     "es": [

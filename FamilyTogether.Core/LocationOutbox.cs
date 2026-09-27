@@ -232,6 +232,34 @@ public sealed class LocationOutbox
         }).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Borra mi historial: primero en el servidor y, si sale bien, lo que queda en cola menos la
+    /// lectura mas reciente (que sera la ultima posicion del mapa, como la que el servidor conserva).
+    /// Con el cerrojo del envio, para que ninguna tanda se cuele entre las dos cosas. Si el servidor
+    /// falla, lanza y no se toca la cola. Devuelve las filas borradas en el servidor.
+    /// </summary>
+    public async Task<int> ClearHistoryAsync(FamilyService service, CancellationToken cancellationToken = default)
+    {
+        await InitAsync().ConfigureAwait(false);
+        await _flushLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var deleted = await service.ClearMyHistoryAsync(cancellationToken).ConfigureAwait(false);
+
+            var newest = await _db.Table<OutboxRow>().OrderByDescending(r => r.AtUtcTicks).FirstOrDefaultAsync().ConfigureAwait(false);
+            if (newest is null)
+                await _db.DeleteAllAsync<OutboxRow>().ConfigureAwait(false);
+            else
+                await _db.ExecuteAsync("delete from outbox_positions where Id <> ?", newest.Id).ConfigureAwait(false);
+
+            return deleted;
+        }
+        finally
+        {
+            _flushLock.Release();
+        }
+    }
+
     /// <summary>Lecturas en cola (cada una puede ir a varios grupos).</summary>
     public async Task<int> PendingCountAsync(CancellationToken cancellationToken = default)
     {

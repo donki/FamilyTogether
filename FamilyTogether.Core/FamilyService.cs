@@ -353,6 +353,15 @@ public sealed class FamilyService
         return result;
     }
 
+    /// <summary>
+    /// Borra mi historial de posiciones en todos mis grupos (RPC <c>clear_my_history</c>). Se
+    /// conserva la ultima posicion de cada grupo (<c>last_positions</c>) para que el mapa me siga
+    /// viendo. Devuelve cuantas filas se borraron. Para borrar tambien lo que este en cola, usar
+    /// <see cref="LocationOutbox.ClearHistoryAsync"/>, que llama a este.
+    /// </summary>
+    public async Task<int> ClearMyHistoryAsync(CancellationToken cancellationToken = default) =>
+        await _client.RpcAsync<int>("clear_my_history", new { }, cancellationToken).ConfigureAwait(false);
+
     /// <summary>Inicio y fin (UTC) del dia <paramref name="day"/> en <paramref name="tz"/>.</summary>
     internal static (DateTimeOffset From, DateTimeOffset To) DayRange(DateOnly day, TimeZoneInfo tz) =>
         (LocalMidnightUtc(day, tz), LocalMidnightUtc(day.AddDays(1), tz));

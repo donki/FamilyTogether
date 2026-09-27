@@ -14,6 +14,8 @@ supabase/
   migrations/02_rls.sql        RLS, permisos por tabla, is_member / is_admin / is_sharing
   migrations/03_functions.sql  las RPC (SECURITY DEFINER)
   migrations/04_cron.sql       pg_cron: retención de 30 días y caducidades
+  migrations/05_coarse.sql     posiciones aproximadas (fuera del historial)
+  migrations/06_clear_history.sql  RPC clear_my_history: borrar mi historial
   functions/notify             avisos FCM (solo datos)
   functions/link-account       vincular Google / Microsoft
   functions/recover-account    recuperar la cuenta en un móvil nuevo
@@ -43,6 +45,11 @@ desprogramar antes de programar). Se aplican **en orden**:
    `familytogether_purge_old_data` a las 03:00 (posiciones, eventos de zona y SOS de más de 30 días) y
    `familytogether_expire` cada 5 min (invitaciones caducadas hace más de 1 h y pausas vencidas). Si
    `pg_cron` no está activado, avisa y no programa nada: actívalo y relánzalo.
+5. `05_coarse.sql` — columna `positions.coarse` (posición aproximada: actualiza el mapa, no el
+   historial).
+6. `06_clear_history.sql` — `clear_my_history()`: borra las posiciones del propio usuario en todos
+   sus grupos y conserva `last_positions`. Sin parámetros (el usuario sale de `auth.uid()`); la tabla
+   sigue sin `DELETE` para `authenticated`.
 
 ### Cómo aplicarlas
 
@@ -52,7 +59,7 @@ desprogramar antes de programar). Se aplican **en orden**:
 túnel SSH, ver más abajo):
 
 ```sh
-for f in 01_schema 02_rls 03_functions 04_cron; do
+for f in 01_schema 02_rls 03_functions 04_cron 05_coarse 06_clear_history; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/$f.sql || break
 done
 ```

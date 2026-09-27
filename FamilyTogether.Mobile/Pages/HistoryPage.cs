@@ -10,6 +10,14 @@ namespace FamilyTogether.Mobile.Pages;
 /// Historial (HU4, FR-014): el recorrido de un miembro en un dia de los ultimos 30 (la retencion),
 /// como una linea en el mapa con su inicio y su fin.
 /// </summary>
+/// <remarks>
+/// <para><b>Por las calles.</b> Primero se dibuja recto, al momento; si el ajuste esta encendido
+/// (Ajustes, por defecto si), se pide la red de calles de las teselas que toca el recorrido
+/// (<see cref="TrackSnapper"/>: a Overpass solo van rectangulos fijos, nunca el recorrido), se
+/// ajusta en el movil y se redibuja. Si falla, se queda recto con una linea que lo dice, sin
+/// dialogos. El ajuste no se guarda en ningun sitio.</para>
+/// <para>El boton de la papelera borra <b>mi</b> historial (<see cref="HistoryActions"/>).</para>
+/// </remarks>
 public sealed class HistoryPage : ContentPage
 {
     private const int RetentionDays = 30;
@@ -17,6 +25,9 @@ public sealed class HistoryPage : ContentPage
     private const string EndColor = "#BA1A1A";
 
     private readonly FamilyService _family = ServiceHelper.Get<FamilyService>();
+    private readonly TrackSnapper _snapper = ServiceHelper.Get<TrackSnapper>();
+    private readonly Label _snapStatus = new();
+    private CancellationTokenSource? _snapCancel;
     private readonly GroupSelector _selector = new();
     private readonly Picker _member = new();
     private readonly DatePicker _day = new() { Format = "D" };
@@ -29,6 +40,19 @@ public sealed class HistoryPage : ContentPage
     public HistoryPage()
     {
         Title = Loc.Get("MenuHistory");
+        ToolbarItems.Add(new ToolbarItem
+        {
+            IconImageSource = "ic_delete_w.png",
+            Text = Loc.Get("ClearHistory"),
+            Command = new Command(async () =>
+            {
+                if (await HistoryActions.ClearMyHistoryAsync(this))
+                    await LoadTrackAsync();
+            }),
+        });
+        _snapStatus.Style = Ui.Style("HintText");
+        _snapStatus.LineBreakMode = LineBreakMode.WordWrap;
+        _snapStatus.IsVisible = false;
         _member.Title = Loc.Get("ChooseMember");
         _summary.Style = Ui.Style("BodyText");
 
@@ -76,7 +100,7 @@ public sealed class HistoryPage : ContentPage
             {
                 Padding = new Thickness(16, 12),
                 Spacing = 6,
-                Children = { _summary, legend, UiKit.Hint(Loc.Format("HistoryRetention", RetentionDays)) },
+                Children = { _summary, legend, _snapStatus, UiKit.Hint(Loc.Format("HistoryRetention", RetentionDays)) },
             },
         };
 
@@ -117,6 +141,12 @@ public sealed class HistoryPage : ContentPage
         await LoadMembersAsync();
     }
 
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _snapCancel?.Cancel();
+    }
+
     private async Task LoadMembersAsync()
     {
         if (_selector.Selected is not { } group)
@@ -155,6 +185,8 @@ public sealed class HistoryPage : ContentPage
             var member = _members[_member.SelectedIndex];
             var day = DateOnly.FromDateTime(_day.Date ?? DateTime.Today);
             _summary.Text = Loc.Get("Loading");
+            _snapCancel?.Cancel();
+            _snapStatus.IsVisible = false;
 
             var (ok, points) = await Ui.RunAsync(this, () => _family.GetHistoryAsync(group.Id, member.UserId, day, TimeZoneInfo.Local));
             if (!ok || points is null)
@@ -177,10 +209,59 @@ public sealed class HistoryPage : ContentPage
 
             var coords = ordered.Select(p => new[] { p.Lat, p.Lon }).ToList();
             await _map.RunAsync($"setTrack({MapView.Json(coords)}, '{StartColor}', '{EndColor}')");
+
+            if (AppState.SnapTracks && ordered.Count >= 2)
+            {
+                _snapCancel = new CancellationTokenSource();
+                _ = SnapAsync([.. ordered.Select(p => new TrackPoint(p.Lat, p.Lon, p.Accuracy))], _snapCancel.Token);
+            }
         }
         finally
         {
             _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// Ajusta el recorrido ya dibujado y lo redibuja. Nunca molesta: si no hay mapa de calles, se
+    /// queda recto y lo dice en una linea.
+    /// </summary>
+    private async Task SnapAsync(IReadOnlyList<TrackPoint> points, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _snapStatus.Text = Loc.Get("SnapWorking");
+            _snapStatus.IsVisible = true;
+
+            var result = await _snapper.SnapAsync(points, cancellationToken);
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            if (result.Track.MatchedPoints > 0)
+            {
+                var coords = result.Track.Line.Select(p => new[] { p.Lat, p.Lon }).ToList();
+                await _map.RunAsync($"setTrack({MapView.Json(coords)}, '{StartColor}', '{EndColor}')");
+            }
+
+            _snapStatus.Text = result switch
+            {
+                { Track.MatchedPoints: 0, TilesMissing: > 0 } => Loc.Get("SnapUnavailable"),
+                { TilesMissing: > 0 } => Loc.Format("SnapPartial", result.TilesMissing, result.TilesWanted),
+                { Track.MatchedPoints: > 0 } => Loc.Get("SnapDone"),
+                _ => string.Empty,
+            };
+            _snapStatus.IsVisible = _snapStatus.Text.Length > 0;
+        }
+        catch (OperationCanceledException)
+        {
+            // Se cambio de persona o de dia, o se salio de la pagina.
+        }
+        catch (Exception ex)
+        {
+            // Es solo el dibujo: se queda recto, sin dialogo.
+            CrashLog.Error("HistoryPage.Snap", ex);
+            if (!cancellationToken.IsCancellationRequested)
+                _snapStatus.Text = Loc.Get("SnapUnavailable");
         }
     }
 }

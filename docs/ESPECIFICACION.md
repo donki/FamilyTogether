@@ -62,6 +62,8 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
 | FR-022 | Nada visible fuera del grupo al que pertenece. |
 | FR-023 | Castellano e inglés según el idioma del dispositivo. |
 | FR-024 | Abandonar un grupo; el grupo deja de ver su posición. |
+| FR-025 | Borrar mi historial (solo el mío, en todos mis grupos), con confirmación; se conserva la última posición de cada grupo. |
+| FR-026 | El recorrido del historial sigue las calles y caminos, ajustado en el móvil; se puede apagar. |
 
 ## Casos límite
 
@@ -107,6 +109,15 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   actualiza la última posición del mapa pero no entra en el historial ni en las zonas.
 - **Al abrir, el mapa se centra en mi posición** (punto azul con su precisión), no en todo el grupo.
 - **Mapa** con MapLibre GL JS 4.7.1 **empaquetado** en la app (Hiker lo carga de unpkg: aquí no).
+- **Borrar mi historial (2026-09-27)**: en Ajustes y en Historial. Borra mis posiciones en todos
+  mis grupos (y lo que queda en cola, salvo la lectura más reciente) y **conserva la última
+  posición de cada grupo** para que el mapa me siga viendo. RPC sin parámetros: nadie borra lo de
+  otro.
+- **Historial por las calles (2026-09-27)**: ajuste en el móvil (HMM/Viterbi + camino más corto)
+  con la red de OpenStreetMap pedida a Overpass **por teselas fijas de 0,02°**, nunca el recorrido;
+  caché de 30 días. Lo que no encaja va recto; nunca un rodeo inventado. Interruptor en Ajustes,
+  encendido por defecto. Solo cambia el dibujo: no se guarda ni se reescribe nada.
+- **Todo texto que se guarde en el servidor va cifrado** con la clave del grupo (regla de Josep).
 - Detalle técnico en [ARQUITECTURA.md](ARQUITECTURA.md).
 
 ## Pendiente de Josep (ver `D:\sOCProjects\NN-PENDIENTE-FamilyTogether.md`)

@@ -130,4 +130,54 @@ public class IntegrationTests
         await a.LeaveGroupAsync(group.Id);
         Assert.DoesNotContain(await a.GetGroupsAsync(), g => g.Id == group.Id);
     }
+
+    /// <summary>
+    /// Borrar el historial (06_clear_history.sql): cada uno borra solo lo suyo, un DELETE directo
+    /// sobre lo de otro lo rechaza el servidor, y la ultima posicion del mapa se conserva.
+    /// </summary>
+    [Fact]
+    public async Task Borrar_historial_solo_borra_lo_mio_y_conserva_la_ultima_posicion()
+    {
+        if (!Enabled)
+            return;
+
+        var a = NewUser();
+        var b = NewUser();
+        await a.Client.EnsureSignedInAsync();
+        await b.Client.EnsureSignedInAsync();
+        var group = await a.CreateGroupAsync("Borrar " + DateTime.UtcNow.ToString("HHmmss"), "Ana", null);
+        var request = await b.RequestJoinAsync((await a.CreateInvitationAsync(group.Id)).Code, "Blas");
+        await a.ApproveAsync(Assert.Single(await a.GetPendingRequestsAsync(group.Id)));
+        Assert.Equal(JoinState.Approved, await b.CheckMyRequestAsync(request));
+
+        // Dos posiciones de cada uno.
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        foreach (var (who, lat) in new[] { (a, 40.40), (b, 41.40) })
+        {
+            var outbox = new LocationOutbox(Path.Combine(Path.GetTempPath(), $"ft-it-{Guid.NewGuid():N}.db"));
+            await outbox.EnqueueAsync(lat, -3.70, 8, 60, now.AddSeconds(-20), [group.Id]);
+            await outbox.EnqueueAsync(lat + 0.001, -3.70, 8, 60, now.AddSeconds(-10), [group.Id]);
+            Assert.Equal(2, await outbox.FlushAsync(who));
+        }
+        var aId = a.Client.UserGuid;
+        var bId = b.Client.UserGuid;
+        Assert.Equal(2, (await b.GetHistoryAsync(group.Id, aId, today, TimeZoneInfo.Utc)).Count);
+
+        // B no puede borrar lo de A por REST (sin permiso de DELETE en positions).
+        await Assert.ThrowsAnyAsync<FamilyTogetherException>(() => b.Client.DeleteAsync("positions", $"user_id=eq.{aId:D}"));
+        Assert.Equal(2, (await a.GetHistoryAsync(group.Id, aId, today, TimeZoneInfo.Utc)).Count);
+
+        // B borra el suyo: solo el suyo.
+        Assert.Equal(2, await b.ClearMyHistoryAsync());
+        Assert.Empty(await a.GetHistoryAsync(group.Id, bId, today, TimeZoneInfo.Utc));
+        Assert.Equal(2, (await b.GetHistoryAsync(group.Id, aId, today, TimeZoneInfo.Utc)).Count);
+
+        // El mapa sigue viendo la ultima posicion de B.
+        var last = Assert.Single(await a.GetLastPositionsAsync(group.Id), p => p.UserId == bId);
+        Assert.Equal(41.401, last.Lat, 4);
+
+        await b.LeaveGroupAsync(group.Id);
+        await a.LeaveGroupAsync(group.Id);
+    }
 }

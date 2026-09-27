@@ -9,7 +9,8 @@ namespace FamilyTogether.Mobile.Pages;
 /// <summary>
 /// Ajustes: idioma (Sistema, Español, English, con su bandera dibujada), mi nombre y avatar en todos
 /// mis grupos, la cuenta (vinculada o no, vincular Google o Microsoft y recuperar la cuenta en este
-/// movil: HU8, FR-003), el estado de permisos y bateria, Novedades y Acerca de.
+/// movil: HU8, FR-003), el historial (ajustar los recorridos a calles y caminos, borrar el mio), el
+/// estado de permisos y bateria, Novedades y Acerca de.
 /// </summary>
 public sealed class SettingsPage : ContentPage
 {
@@ -101,6 +102,7 @@ public sealed class SettingsPage : ContentPage
                             UiKit.Outline(Loc.Get("RecoverAction"), "ic_recover.png", async (_, _) => await RecoverAsync()),
                         },
                     }),
+                    HistoryCard(),
                     UiKit.Card(new VerticalStackLayout
                     {
                         Spacing = 10,
@@ -203,6 +205,33 @@ public sealed class SettingsPage : ContentPage
                 }
             });
         }
+    }
+
+    // ------------------------------------------------------------------ historial
+
+    /// <summary>
+    /// Ajustar los recorridos a calles y caminos (encendido por defecto; consulta OpenStreetMap
+    /// por teselas fijas, nunca el recorrido) y borrar mi historial.
+    /// </summary>
+    private View HistoryCard()
+    {
+        var snap = new Switch { IsToggled = AppState.SnapTracks };
+        snap.Toggled += (_, e) => AppState.SnapTracks = e.Value;
+        SemanticProperties.SetDescription(snap, Loc.Get("SnapTracks"));
+
+        return UiKit.Card(new VerticalStackLayout
+        {
+            Spacing = 10,
+            Children =
+            {
+                UiKit.Title(Loc.Get("HistoryTitle")),
+                UiKit.Row(UiKit.Body(Loc.Get("SnapTracks")), snap),
+                UiKit.Hint(Loc.Get("SnapTracksHint")),
+                UiKit.Separator(),
+                UiKit.Danger(Loc.Get("ClearHistory"), "ic_delete_danger.png", async (_, _) => await HistoryActions.ClearMyHistoryAsync(this)),
+                UiKit.Hint(Loc.Get("ClearHistoryHint")),
+            },
+        });
     }
 
     // ------------------------------------------------------------------ perfil

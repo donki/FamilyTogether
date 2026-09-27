@@ -30,6 +30,9 @@ cada una. Para eso tiene que compartir tu ubicación con tu grupo, y lo hace as�
 - En un servidor propio (Supabase) alojado en la Unión Europea.
 - **El historial de posiciones se borra solo a los 30 días**, igual que los SOS y los avisos de zona.
 - Si abandonas un grupo o te expulsan, el grupo deja de ver tu posición y se borra tu historial en él.
+- **Puedes borrar tu historial cuando quieras** (Ajustes o Historial): se borran tus posiciones en
+  todos tus grupos, también las que el móvil aún no había enviado. Se conserva solo tu última
+  posición en cada grupo, para que el mapa te siga viendo. Nadie puede borrar el historial de otro.
 
 ## Con quién se comparten
 
@@ -39,6 +42,13 @@ cada una. Para eso tiene que compartir tu ubicación con tu grupo, y lo hace as�
   de Firebase: **no hay analítica, publicidad ni rastreadores**.
 - **OpenFreeMap** sirve las teselas del mapa: recibe tu dirección IP y la zona del mapa que miras, no
   tu posición ni tus datos.
+- **OpenStreetMap, por Overpass** (`overpass-api.de`, de FOSSGIS e. V., Alemania, y
+  `overpass.kumi.systems`, de Kumi Systems, Austria): para dibujar los recorridos del historial por
+  las calles, el móvil pide el mapa de calles y caminos de **cuadrados fijos de unos 2 km** (una
+  rejilla de 0,02°) que toca el recorrido que estás viendo. Reciben tu dirección IP y esos
+  cuadrados; **nunca el recorrido, las horas ni quién es la persona**. El ajuste se hace en tu móvil
+  y no se guarda; los cuadrados se guardan en el móvil 30 días para no volver a pedirlos. Se puede
+  apagar en Ajustes («Ajustar recorridos a calles y caminos»); apagado, no se pide nada.
 - No vendemos ni cedemos tus datos a nadie.
 
 ## Permisos
@@ -89,6 +99,9 @@ do that it has to share your location with your group, and it does so like this:
 - On our own server (Supabase) hosted in the European Union.
 - **Location history is deleted automatically after 30 days**, as are SOS alerts and zone events.
 - If you leave a group or are removed, the group stops seeing your position and your history in it is deleted.
+- **You can delete your history whenever you like** (Settings or History): your positions are deleted
+  in all your groups, including those the phone had not sent yet. Only your last position in each
+  group is kept, so the map still shows you. Nobody can delete someone else's history.
 
 ## Who it is shared with
 
@@ -98,6 +111,13 @@ do that it has to share your location with your group, and it does so like this:
   **no analytics, advertising or trackers**.
 - **OpenFreeMap** serves the map tiles: it receives your IP address and the map area you look at, not
   your position or your data.
+- **OpenStreetMap, through Overpass** (`overpass-api.de`, run by FOSSGIS e. V., Germany, and
+  `overpass.kumi.systems`, run by Kumi Systems, Austria): to draw history routes along the streets,
+  the phone asks for the street and path map of the **fixed squares of about 2 km** (a 0.02° grid)
+  that the route you are viewing touches. They receive your IP address and those squares; **never the
+  route, the times or who the person is**. The snapping happens on your phone and is not stored; the
+  squares are kept on the phone for 30 days so they are not requested again. You can turn it off in
+  Settings ("Snap routes to streets and paths"); when off, nothing is requested.
 - We do not sell or hand over your data to anyone.
 
 ## Permissions

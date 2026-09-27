@@ -51,6 +51,13 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp => new ZoneWatcher(database, sp.GetRequiredService<FamilyService>()));
         builder.Services.AddSingleton(sp => new EventFeed(database, sp.GetRequiredService<FamilyService>()));
 
+        // Red de calles para dibujar el historial por las calles: teselas fijas de OpenStreetMap
+        // pedidas a Overpass (nunca el recorrido), guardadas en la cache de la app. Cliente propio:
+        // una tesela urbana tarda mas que los 20 s del de Supabase.
+        builder.Services.AddSingleton(_ => new OsmRoadSource(
+            new HttpClient { Timeout = TimeSpan.FromSeconds(75) }, Path.Combine(FileSystem.CacheDirectory, "roads")));
+        builder.Services.AddSingleton(sp => new TrackSnapper(sp.GetRequiredService<OsmRoadSource>()));
+
 #if ANDROID
         // La parte nativa: servicio de ubicacion en primer plano, FCM y avisos.
         builder.Services.AddSingleton<ILocationSharing, Platforms.Android.LocationSharing>();
