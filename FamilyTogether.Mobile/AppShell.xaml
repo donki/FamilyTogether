@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:loc="clr-namespace:FamilyTogether.Mobile.Localization"
+       xmlns:pages="clr-namespace:FamilyTogether.Mobile.Pages"
+       xmlns:mauiControls="clr-namespace:Microsoft.Maui.Controls;assembly=Microsoft.Maui.Controls"
+       x:Class="FamilyTogether.Mobile.AppShell"
+       FlyoutBehavior="Flyout"
+       FlyoutHeaderBehavior="Scroll"
+       FlyoutWidth="280"
+       FlyoutBackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+       Shell.BackgroundColor="{StaticResource Primary}"
+       Shell.ForegroundColor="{StaticResource OnPrimary}"
+       Shell.TitleColor="{StaticResource OnPrimary}"
+       Shell.DisabledColor="{StaticResource OnPrimaryMuted}"
+       Shell.UnselectedColor="{StaticResource OnPrimaryMuted}">
+
+    <!-- Plantilla de las filas del menu: icono a la izquierda y texto que parte de linea con la
+         letra grande (nada de altura fija). -->
+    <Shell.ItemTemplate>
+        <DataTemplate x:DataType="mauiControls:BaseShellItem">
+            <Grid MinimumHeightRequest="52" Padding="20,12" ColumnDefinitions="24,*" ColumnSpacing="16">
+                <Image Grid.Column="0" Source="{Binding FlyoutIcon}" HeightRequest="22" WidthRequest="22"
+                       Aspect="AspectFit" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding Title}" VerticalOptions="Center" FontSize="16"
+                       LineBreakMode="WordWrap"
+                       TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+            </Grid>
+        </DataTemplate>
+    </Shell.ItemTemplate>
+
+    <!-- Cabecera del menu: logo + nombre. Se desplaza con la lista para no tapar filas con la
+         letra grande y el movil en horizontal. -->
+    <Shell.FlyoutHeader>
+        <Grid BackgroundColor="{StaticResource Primary}" Padding="20,24,20,16">
+            <VerticalStackLayout VerticalOptions="End" Spacing="6">
+                <Image Source="app_logo.png" WidthRequest="52" HeightRequest="52" HorizontalOptions="Start" />
+                <Label Text="{loc:T AppName}" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource OnPrimary}" />
+            </VerticalStackLayout>
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <!-- Bienvenida: primer arranque (y «servidor sin configurar»). Fuera del menu. -->
+    <FlyoutItem x:Name="WelcomeItem" FlyoutItemIsVisible="False">
+        <ShellContent Route="WelcomePage" ContentTemplate="{DataTemplate pages:WelcomePage}" />
+    </FlyoutItem>
+
+    <!-- Inicio -->
+    <FlyoutItem x:Name="MapItem" Title="{loc:T MenuMap}" FlyoutIcon="ic_map.png">
+        <ShellContent Route="MapPage" ContentTemplate="{DataTemplate pages:MapPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuGroups}" FlyoutIcon="ic_group.png">
+        <ShellContent Route="GroupsPage" ContentTemplate="{DataTemplate pages:GroupsPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuZones}" FlyoutIcon="ic_zone.png">
+        <ShellContent Route="ZonesPage" ContentTemplate="{DataTemplate pages:ZonesPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuHistory}" FlyoutIcon="ic_history.png">
+        <ShellContent Route="HistoryPage" ContentTemplate="{DataTemplate pages:HistoryPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuGuide}" FlyoutIcon="ic_guide.png">
+        <ShellContent Route="GuidePage" ContentTemplate="{DataTemplate pages:GuidePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuSettings}" FlyoutIcon="ic_settings.png">
+        <ShellContent Route="SettingsPage" ContentTemplate="{DataTemplate pages:SettingsPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuWhatsNew}" FlyoutIcon="ic_news.png">
+        <ShellContent Route="WhatsNewPage" ContentTemplate="{DataTemplate pages:WhatsNewPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="{loc:T MenuAbout}" FlyoutIcon="ic_info.png">
+        <ShellContent Route="AboutPage" ContentTemplate="{DataTemplate pages:AboutPage}" />
+    </FlyoutItem>
+
+    <!-- Pie del menu: version (de AppInfo, nunca escrita a mano). -->
+    <Shell.FlyoutFooter>
+        <Grid Padding="20,12">
+            <Label x:Name="VersionLabel" Style="{StaticResource HintText}"
+                   HorizontalOptions="Center" VerticalOptions="Center" />
+        </Grid>
+    </Shell.FlyoutFooter>
+
+</Shell>

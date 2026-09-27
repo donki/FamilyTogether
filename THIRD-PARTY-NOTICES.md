@@ -1,6 +1,6 @@
-# Avisos de terceros — FamilyLink
+# Avisos de terceros — Family Together
 
-FamilyLink tiene licencia MIT. Usa estos componentes, todos compatibles con MIT y con uso comercial
+Family Together tiene licencia MIT. Usa estos componentes, todos compatibles con MIT y con uso comercial
 (constitución general, principio 1):
 
 | Componente | Uso | Licencia |

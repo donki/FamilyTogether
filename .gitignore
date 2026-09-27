@@ -11,10 +11,10 @@ obj/
 keystore.password.txt
 
 # Configuración local con identificadores y claves (se genera a partir de estos ficheros al compilar)
-familylink.local.props
+familytogether.local.props
 *.g.cs
 
-# Firebase: el google-services.json / las opciones van en familylink.local.props
+# Firebase: el google-services.json / las opciones van en familytogether.local.props
 google-services.json
 
 # Supabase CLI

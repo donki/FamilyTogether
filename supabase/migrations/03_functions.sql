@@ -1,4 +1,4 @@
--- FamilyLink — funciones RPC (ARQUITECTURA §6, «Funciones RPC»).
+-- Family Together — funciones RPC (ARQUITECTURA §6, «Funciones RPC»).
 -- Ejecutar despues de 02_rls.sql. Idempotente: se puede relanzar.
 --
 -- Todas son SECURITY DEFINER con search_path fijo y comprueban auth.uid() antes de tocar nada.

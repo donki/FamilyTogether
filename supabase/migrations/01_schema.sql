@@ -1,4 +1,4 @@
--- FamilyLink — esquema PostgreSQL (Supabase)
+-- Family Together — esquema PostgreSQL (Supabase)
 -- Ejecutar antes que 02_rls.sql. Idempotente: se puede relanzar.
 --
 -- El contrato es ../../docs/ARQUITECTURA.md §6. Todo el texto del usuario llega ya cifrado

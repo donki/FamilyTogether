@@ -1,6 +1,6 @@
-# Especificación: FamilyLink (localización familiar, Android)
+# Especificación: Family Together (localización familiar, Android)
 
-27 sept 2026 · Josep. Nombre de trabajo; **el nombre público está por decidir** (ver abajo).
+27 sept 2026 · Josep. Nombre: **Family Together** (se empezó como «FamilyLink», demasiado parecido a Family Link, de Google).
 
 ## Resumen
 
@@ -104,10 +104,9 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
 - **Mapa** con MapLibre GL JS 4.7.1 **empaquetado** en la app (Hiker lo carga de unpkg: aquí no).
 - Detalle técnico en [ARQUITECTURA.md](ARQUITECTURA.md).
 
-## Pendiente de Josep (ver `D:\sOCProjects\NN-PENDIENTE-FamilyLink.md`)
+## Pendiente de Josep (ver `D:\sOCProjects\NN-PENDIENTE-FamilyTogether.md`)
 
-- **Nombre público**: «Family Link» es una app de Google; Play lo rechazaría por marca o suplantación.
-- Proyecto de Supabase de desarrollo (URL y clave publicable) con usuarios anónimos activados.
+- Proyecto de Supabase (supabase.com, 2026-09-27): usuarios anónimos, pg_cron y acceso para aplicar el esquema.
 - Proyecto de Firebase (solo Messaging) y cuenta de servicio para la Edge Function.
 - Clientes OAuth propios de Google y Microsoft para vincular.
-- Oracle Cloud (instancia Always Free en Madrid o Fráncfort), dominio para TLS y copia diaria.
+- Más adelante: Oracle Cloud Always Free (Madrid o Fráncfort), dominio para TLS y copia diaria. Mientras, Supabase de supabase.com.

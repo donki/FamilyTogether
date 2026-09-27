@@ -1,4 +1,4 @@
--- FamilyLink — Row Level Security, permisos por tabla y funciones auxiliares.
+-- Family Together — Row Level Security, permisos por tabla y funciones auxiliares.
 -- Ejecutar despues de 01_schema.sql. Idempotente: se puede relanzar.
 --
 -- Modelo (ARQUITECTURA §6 y constitucion Mobile §10):

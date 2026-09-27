@@ -1,4 +1,4 @@
--- FamilyLink — tareas periodicas con pg_cron (ARQUITECTURA §6, «pg_cron»).
+-- Family Together — tareas periodicas con pg_cron (ARQUITECTURA §6, «pg_cron»).
 -- Ejecutar despues de 03_functions.sql. Idempotente: cada tarea se desprograma (si existe) antes de
 -- volver a programarla.
 --
@@ -56,16 +56,16 @@ begin
         return;
     end if;
 
-    if exists (select 1 from cron.job where jobname = 'familylink_purge_old_data') then
-        perform cron.unschedule('familylink_purge_old_data');
+    if exists (select 1 from cron.job where jobname = 'familytogether_purge_old_data') then
+        perform cron.unschedule('familytogether_purge_old_data');
     end if;
-    perform cron.schedule('familylink_purge_old_data', '0 3 * * *',
+    perform cron.schedule('familytogether_purge_old_data', '0 3 * * *',
                           'select public.purge_old_data()');
 
-    if exists (select 1 from cron.job where jobname = 'familylink_expire') then
-        perform cron.unschedule('familylink_expire');
+    if exists (select 1 from cron.job where jobname = 'familytogether_expire') then
+        perform cron.unschedule('familytogether_expire');
     end if;
-    perform cron.schedule('familylink_expire', '*/5 * * * *',
+    perform cron.schedule('familytogether_expire', '*/5 * * * *',
                           'select public.expire_invitations_and_pauses()');
 end;
 $$;

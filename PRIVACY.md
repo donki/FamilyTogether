@@ -1,8 +1,8 @@
-# Política de privacidad — FamilyLink
+# Política de privacidad — Family Together
 
-*Última actualización: 27 de septiembre de 2026. [English below](#privacy-policy--familylink).*
+*Última actualización: 27 de septiembre de 2026. [English below](#privacy-policy--familytogether).*
 
-FamilyLink sirve para que las personas de un grupo cerrado (tu familia, tus amigos) vean dónde está
+Family Together sirve para que las personas de un grupo cerrado (tu familia, tus amigos) vean dónde está
 cada una. Para eso tiene que compartir tu ubicación con tu grupo, y lo hace así:
 
 ## Qué datos se tratan
@@ -58,11 +58,11 @@ Protección de Datos (www.aepd.es).
 
 ---
 
-# Privacy policy — FamilyLink
+# Privacy policy — Family Together
 
 *Last updated: September 27, 2026. The Spanish version prevails in case of discrepancy.*
 
-FamilyLink lets the people in a closed group (your family, your friends) see where everyone is. To
+Family Together lets the people in a closed group (your family, your friends) see where everyone is. To
 do that it has to share your location with your group, and it does so like this:
 
 ## What data is processed

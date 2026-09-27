@@ -1,8 +1,8 @@
-# FamilyLink — lo minimo para `supabase functions deploy`.
+# Family Together — lo minimo para `supabase functions deploy`.
 # Las tres funciones exigen un JWT valido de Supabase: el gateway rechaza la llamada sin sesion antes
 # de que llegue al codigo, y cada funcion vuelve a validar el usuario con auth.getUser.
 
-project_id = "familylink"
+project_id = "familytogether"
 
 [functions.notify]
 verify_jwt = true

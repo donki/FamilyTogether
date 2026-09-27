@@ -1,4 +1,4 @@
-// FamilyLink — Edge Function `link-account` (ARQUITECTURA §2).
+// Family Together — Edge Function `link-account` (ARQUITECTURA §2).
 //
 // POST /functions/v1/link-account   Authorization: Bearer <JWT del usuario (anonimo)>
 //   { "provider": "google" | "microsoft", "id_token": "<id_token del proveedor>" }

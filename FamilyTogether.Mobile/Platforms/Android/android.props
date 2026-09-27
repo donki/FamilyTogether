@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    Dependencias solo de Android. Lo importa FamilyTogether.Mobile.csproj con
+      <Import Project="Platforms\Android\android.props" />
+
+    FCM, SOLO Messaging (constitucion General 1.2 y Mobile 10): sin Analytics ni Crashlytics.
+    Xamarin.Firebase.Messaging 125.1.3 (la estable mas reciente en nuget.org el 2026-09-27; trae
+    destino net10.0-android36.0). Licencia del paquete: MIT (los bindings de .NET) AND Apache-2.0
+    (el SDK de Firebase de Google), las dos compatibles con uso comercial.
+    Arrastra Play Services Basement/Base/Tasks/CloudMessaging (necesarios para recibir push) y
+    Firebase Common/Installations; NO arrastra firebase-analytics (Measurement.Connector es solo
+    una interfaz vacia). Se inicializa a mano sin google-services.json (FirebaseSetup.cs).
+  -->
+  <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
+    <PackageReference Include="Xamarin.Firebase.Messaging" Version="125.1.3" />
+
+    <!--
+      Firebase sube Lifecycle a 2.11, Fragment a 1.9 y Collection a 1.6, pero MAUI 10.0.20 trae
+      las variantes Ktx/Process fijadas a la version anterior (avisos NU1608 y riesgo de clases
+      desfasadas en tiempo de ejecucion). Se suben a la par. Bindings MIT, AndroidX Apache-2.0.
+    -->
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.0.1" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core.Ktx" Version="2.11.0.1" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.Process" Version="2.11.0.1" />
+    <PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.0" />
+    <PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" />
+  </ItemGroup>
+</Project>

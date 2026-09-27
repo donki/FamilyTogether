@@ -1,4 +1,4 @@
-# Changelog — FamilyLink
+# Changelog — Family Together
 
 ## 2026.09.27.00 — Primera versión (en desarrollo)
 

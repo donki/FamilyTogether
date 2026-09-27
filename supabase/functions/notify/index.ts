@@ -1,4 +1,4 @@
-// FamilyLink — Edge Function `notify` (ARQUITECTURA §7).
+// Family Together — Edge Function `notify` (ARQUITECTURA §7).
 //
 // POST /functions/v1/notify   Authorization: Bearer <JWT del usuario>
 //   { "type": "join_request" | "request_resolved" | "key_share" | "sos" | "zone_event", "id": "<uuid>" }

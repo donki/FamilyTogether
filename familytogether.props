@@ -1,0 +1,73 @@
+<Project>
+
+  <!--
+    Configuracion de Family Together: proyecto de Supabase, clientes OAuth para vincular la cuenta y
+    Firebase (solo Messaging).
+
+    Los valores reales NO viven en el repositorio (constitucion y push protection de GitHub): se
+    leen de familytogether.local.props (ignorado por git) o de variables de entorno, y de ahi se genera
+    en obj/ la clase FamilyTogetherConfig con constantes. Es el mismo mecanismo que oauth.props de
+    Task Manager.
+
+    Sin valores el fichero se genera igual, con cadenas vacias: la compilacion no se rompe,
+    FamilyTogetherConfig.IsServerConfigured vale false y la app lo cuenta en vez de fallar.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)familytogether.local.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)familytogether.local.props')" />
+
+  <PropertyGroup>
+    <FtSupabaseUrl Condition="'$(FtSupabaseUrl)' == ''">$(FT_SUPABASE_URL)</FtSupabaseUrl>
+    <FtPublishableKey Condition="'$(FtPublishableKey)' == ''">$(FT_PUBLISHABLE_KEY)</FtPublishableKey>
+    <FtGoogleClientId Condition="'$(FtGoogleClientId)' == ''">$(FT_GOOGLE_CLIENT_ID)</FtGoogleClientId>
+    <FtGoogleClientSecret Condition="'$(FtGoogleClientSecret)' == ''">$(FT_GOOGLE_CLIENT_SECRET)</FtGoogleClientSecret>
+    <FtMicrosoftClientId Condition="'$(FtMicrosoftClientId)' == ''">$(FT_MS_CLIENT_ID)</FtMicrosoftClientId>
+    <FtFcmProjectId Condition="'$(FtFcmProjectId)' == ''">$(FT_FCM_PROJECT_ID)</FtFcmProjectId>
+    <FtFcmApplicationId Condition="'$(FtFcmApplicationId)' == ''">$(FT_FCM_APP_ID)</FtFcmApplicationId>
+    <FtFcmApiKey Condition="'$(FtFcmApiKey)' == ''">$(FT_FCM_API_KEY)</FtFcmApiKey>
+    <FtFcmSenderId Condition="'$(FtFcmSenderId)' == ''">$(FT_FCM_SENDER_ID)</FtFcmSenderId>
+
+    <!--
+      Esquema de vuelta de Google: el identificador de cliente invertido
+      (com.googleusercontent.apps.<id>). Google no admite un esquema cualquiera (Error 400:
+      invalid_request) y el intent-filter de Android necesita el valor en una constante de
+      compilacion, asi que se calcula aqui y viaja como una constante mas. Sin cliente, vacio.
+      Por que el de escritorio y no uno de tipo Android: ver IdentitySignInService.
+    -->
+    <FtGoogleRedirectScheme Condition="'$(FtGoogleClientId)' != ''">com.googleusercontent.apps.$(FtGoogleClientId.Replace('.apps.googleusercontent.com', ''))</FtGoogleRedirectScheme>
+  </PropertyGroup>
+
+  <!--
+    El fichero se rehace SIEMPRE, sin Inputs/Outputs: los valores de verdad no estan en este
+    fichero sino en familytogether.local.props o en el entorno, y con Inputs apuntando aqui MSBuild se
+    saltaba la generacion al cambiar un identificador (le costo una tarde a Task Manager el
+    2026-09-04). WriteOnlyWhenDifferent mantiene la compilacion incremental.
+  -->
+  <Target Name="GenerateFamilyTogetherConfig" BeforeTargets="BeforeCompile;CoreCompile">
+    <ItemGroup>
+      <FtConfigLine Include="// Generado por familytogether.props. No editar ni subir al repositorio." />
+      <FtConfigLine Include="namespace FamilyTogether.Core%3B" />
+      <FtConfigLine Include="public static partial class FamilyTogetherConfig" />
+      <FtConfigLine Include="{" />
+      <FtConfigLine Include="    public const string SupabaseUrl = &quot;$(FtSupabaseUrl)&quot;%3B" />
+      <FtConfigLine Include="    public const string PublishableKey = &quot;$(FtPublishableKey)&quot;%3B" />
+      <FtConfigLine Include="    public const string GoogleClientId = &quot;$(FtGoogleClientId)&quot;%3B" />
+      <FtConfigLine Include="    public const string GoogleClientSecret = &quot;$(FtGoogleClientSecret)&quot;%3B" />
+      <FtConfigLine Include="    public const string GoogleRedirectScheme = &quot;$(FtGoogleRedirectScheme)&quot;%3B" />
+      <FtConfigLine Include="    public const string MicrosoftClientId = &quot;$(FtMicrosoftClientId)&quot;%3B" />
+      <FtConfigLine Include="    public const string FcmProjectId = &quot;$(FtFcmProjectId)&quot;%3B" />
+      <FtConfigLine Include="    public const string FcmApplicationId = &quot;$(FtFcmApplicationId)&quot;%3B" />
+      <FtConfigLine Include="    public const string FcmApiKey = &quot;$(FtFcmApiKey)&quot;%3B" />
+      <FtConfigLine Include="    public const string FcmSenderId = &quot;$(FtFcmSenderId)&quot;%3B" />
+      <FtConfigLine Include="}" />
+    </ItemGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <WriteLinesToFile File="$(IntermediateOutputPath)FamilyTogetherConfig.g.cs" Lines="@(FtConfigLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <Target Name="IncludeFamilyTogetherConfig" DependsOnTargets="GenerateFamilyTogetherConfig" BeforeTargets="BeforeCompile;CoreCompile">
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)FamilyTogetherConfig.g.cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>

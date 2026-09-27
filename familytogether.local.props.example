@@ -1,0 +1,44 @@
+<Project>
+  <!--
+    Copia este fichero como familytogether.local.props (ignorado por git) y rellena los valores. Cada
+    uno se puede dar tambien por variable de entorno (entre parentesis); el fichero manda.
+    Lo que se deje vacio se compila vacio: la app arranca y dice que no hay servidor configurado
+    (FamilyTogetherConfig.IsServerConfigured / IsPushConfigured valen false).
+
+    Supabase (Project Settings > API):
+    - FtSupabaseUrl (FT_SUPABASE_URL): URL del proyecto, sin /rest/v1. p. ej. https://xxxx.supabase.co
+    - FtPublishableKey (FT_PUBLISHABLE_KEY): clave publicable (sb_publishable_...). Publica por
+      diseño; la secreta (sb_secret_...) NUNCA va aqui: solo en los secretos de las Edge Functions.
+      El proyecto necesita los usuarios anonimos activados (Authentication > Sign In / Providers).
+
+    Vincular la cuenta (opcional; sin cliente, ese proveedor no se ofrece):
+    - FtGoogleClientId (FT_GOOGLE_CLIENT_ID): cliente OAuth de Google de tipo «aplicacion de
+      escritorio». Vuelve por su esquema invertido com.googleusercontent.apps.<id>:/oauth2redirect,
+      que se calcula solo (FamilyTogetherConfig.GoogleRedirectScheme).
+    - FtGoogleClientSecret (FT_GOOGLE_CLIENT_SECRET): el "secreto" de ese cliente de escritorio.
+      Google lo exige al canjear el codigo; viaja en el binario y no es secreto de verdad (lo que
+      protege es PKCE).
+    - FtMicrosoftClientId (FT_MS_CLIENT_ID): registro de Entra ID multi-tenant, cuentas personales y
+      de empresa, cliente publico, con la redireccion propia de la app dada de alta.
+    Los mismos identificadores van en el secreto GOOGLE_CLIENT_IDS / MICROSOFT_CLIENT_IDS de las
+    funciones link-account y recover-account (comprueban la audiencia del id_token).
+
+    Firebase (solo Messaging; se inicializa a mano, sin google-services.json). Todo sale de la
+    configuracion de la app Android en la consola de Firebase (o del google-services.json):
+    - FtFcmProjectId (FT_FCM_PROJECT_ID): project_info.project_id
+    - FtFcmApplicationId (FT_FCM_APP_ID): client[].client_info.mobilesdk_app_id (1:123:android:abc)
+    - FtFcmApiKey (FT_FCM_API_KEY): client[].api_key[].current_key
+    - FtFcmSenderId (FT_FCM_SENDER_ID): project_info.project_number
+  -->
+  <PropertyGroup>
+    <FtSupabaseUrl></FtSupabaseUrl>
+    <FtPublishableKey></FtPublishableKey>
+    <FtGoogleClientId></FtGoogleClientId>
+    <FtGoogleClientSecret></FtGoogleClientSecret>
+    <FtMicrosoftClientId></FtMicrosoftClientId>
+    <FtFcmProjectId></FtFcmProjectId>
+    <FtFcmApplicationId></FtFcmApplicationId>
+    <FtFcmApiKey></FtFcmApiKey>
+    <FtFcmSenderId></FtFcmSenderId>
+  </PropertyGroup>
+</Project>

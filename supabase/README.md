@@ -1,6 +1,6 @@
-# Supabase — FamilyLink
+# Supabase — Family Together
 
-El servidor de FamilyLink: esquema, RLS, funciones RPC, tareas de `pg_cron` y tres Edge Functions.
+El servidor de Family Together: esquema, RLS, funciones RPC, tareas de `pg_cron` y tres Edge Functions.
 El contrato que cumple todo esto es [../docs/ARQUITECTURA.md](../docs/ARQUITECTURA.md) (§2 a §7); las
 reglas, la constitución Mobile §10 y Web §5.
 
@@ -40,8 +40,8 @@ desprogramar antes de programar). Se aplican **en orden**:
    mensaje (`not_member`, `not_admin`, `expired`, `not_found`, `already_member`, `last_admin`,
    `paused`, `not_pending`). `transfer_user` solo la puede ejecutar `service_role`.
 4. `04_cron.sql` — crea `pg_cron` si está disponible y programa dos tareas (UTC):
-   `familylink_purge_old_data` a las 03:00 (posiciones, eventos de zona y SOS de más de 30 días) y
-   `familylink_expire` cada 5 min (invitaciones caducadas hace más de 1 h y pausas vencidas). Si
+   `familytogether_purge_old_data` a las 03:00 (posiciones, eventos de zona y SOS de más de 30 días) y
+   `familytogether_expire` cada 5 min (invitaciones caducadas hace más de 1 h y pausas vencidas). Si
    `pg_cron` no está activado, avisa y no programa nada: actívalo y relánzalo.
 
 ### Cómo aplicarlas
@@ -94,7 +94,7 @@ Nunca en el repositorio ni en la app: la cuenta de servicio y la `service_role k
 
 ### Desplegar
 
-Con la CLI de Supabase (MIT), desde la carpeta `FamilyLink`:
+Con la CLI de Supabase (MIT), desde la carpeta `Family Together`:
 
 ```sh
 supabase login
@@ -139,8 +139,8 @@ PostgreSQL 17 portátil (binarios zip de EnterpriseDB) en `D:\dev\pgsql`, datos 
 D:/dev/pgsql/bin/initdb.exe -D D:/dev/pgsql-data -U postgres -A trust -E UTF8 --no-locale
 # cada vez
 D:/dev/pgsql/bin/pg_ctl.exe -D D:/dev/pgsql-data -o "-p 54317 -c listen_addresses=localhost" -l D:/dev/pgsql-data/server.log start
-D:/dev/pgsql/bin/createdb.exe -p 54317 -U postgres familylink_test      # la primera vez
-D:/dev/pgsql/bin/psql.exe -p 54317 -U postgres -d familylink_test -v ON_ERROR_STOP=1 -f supabase/tests/prueba_local.sql
+D:/dev/pgsql/bin/createdb.exe -p 54317 -U postgres familytogether_test      # la primera vez
+D:/dev/pgsql/bin/psql.exe -p 54317 -U postgres -d familytogether_test -v ON_ERROR_STOP=1 -f supabase/tests/prueba_local.sql
 D:/dev/pgsql/bin/pg_ctl.exe -D D:/dev/pgsql-data stop
 ```
 
@@ -175,8 +175,8 @@ curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER      # y volver a entrar
 
 git clone --depth 1 https://github.com/supabase/supabase
-mkdir -p ~/familylink && cp -rf supabase/docker/* ~/familylink/ && cp supabase/docker/.env.example ~/familylink/.env
-cd ~/familylink
+mkdir -p ~/familytogether && cp -rf supabase/docker/* ~/familytogether/ && cp supabase/docker/.env.example ~/familytogether/.env
+cd ~/familytogether
 ```
 
 En `.env` (nunca al repositorio):
@@ -204,7 +204,7 @@ Las imágenes son multiarquitectura: funcionan en ARM sin cambios. La imagen de 
 ya trae `pg_cron`.
 
 **Edge Functions**: en el autoalojado se sirven desde `volumes/functions/<nombre>/index.ts`. Copiar
-`supabase/functions/*` (incluido `_shared`) a `~/familylink/volumes/functions/` y
+`supabase/functions/*` (incluido `_shared`) a `~/familytogether/volumes/functions/` y
 `docker compose restart functions`. La verificación del JWT la hace el servicio con
 `FUNCTIONS_VERIFY_JWT=true` en `.env` (viene a `false`).
 
@@ -250,38 +250,38 @@ El mismo túnel da `psql` contra `localhost:5432` para las migraciones.
 
 ### 4. Copia diaria a Object Storage (retención 7 días)
 
-1. *Storage > Buckets*: crear `familylink-backups` (privado, *Standard*). En el bucket,
+1. *Storage > Buckets*: crear `familytogether-backups` (privado, *Standard*). En el bucket,
    *Lifecycle Policy Rules*: **borrar objetos de más de 7 días**. Así la retención no depende del
    script.
 2. Dar permiso a la instancia sin guardar claves: *Identity > Dynamic Groups* con la instancia
    (`instance.id = '<ocid>'`) y una política
-   `Allow dynamic-group familylink-vm to manage objects in compartment <c> where target.bucket.name='familylink-backups'`.
+   `Allow dynamic-group familytogether-vm to manage objects in compartment <c> where target.bucket.name='familytogether-backups'`.
 3. En la instancia: `bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"`
    (OCI CLI, UPL/Apache 2.0).
-4. Script `/home/ubuntu/backup-familylink.sh` (`chmod 700`):
+4. Script `/home/ubuntu/backup-familytogether.sh` (`chmod 700`):
 
    ```sh
    #!/usr/bin/env bash
-   # Copia diaria de la base de FamilyLink a Object Storage. La retencion (7 dias) la aplica la
+   # Copia diaria de la base de Family Together a Object Storage. La retencion (7 dias) la aplica la
    # regla de ciclo de vida del bucket; el script borra ademas lo que pase de 7 dias por si acaso.
    set -euo pipefail
-   BUCKET=familylink-backups
+   BUCKET=familytogether-backups
    STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-   FILE=/tmp/familylink-$STAMP.dump
+   FILE=/tmp/familytogether-$STAMP.dump
    export PATH=$HOME/bin:$PATH
 
    # supabase_admin es el superusuario de la imagen: con postgres faltarian esquemas internos.
-   PGPASS=$(grep '^POSTGRES_PASSWORD=' "$HOME/familylink/.env" | cut -d= -f2-)
+   PGPASS=$(grep '^POSTGRES_PASSWORD=' "$HOME/familytogether/.env" | cut -d= -f2-)
    docker exec -e PGPASSWORD="$PGPASS" supabase-db pg_dump -U supabase_admin -h localhost -d postgres -Fc > "$FILE"
    test -s "$FILE"
    oci os object put --auth instance_principal -bn "$BUCKET" --file "$FILE" \
-       --name "db/familylink-$STAMP.dump" --no-multipart --force
+       --name "db/familytogether-$STAMP.dump" --no-multipart --force
    rm -f "$FILE"
 
    LIMIT=$(date -u -d '7 days ago' +%Y%m%dT%H%M%SZ)
    oci os object list --auth instance_principal -bn "$BUCKET" --prefix db/ --all \
        --query 'data[].name' --raw-output | tr -d '[]", ' | grep . | while read -r name; do
-     stamp=${name#db/familylink-}; stamp=${stamp%.dump}
+     stamp=${name#db/familytogether-}; stamp=${stamp%.dump}
      if [[ "$stamp" < "$LIMIT" ]]; then
        oci os object delete --auth instance_principal -bn "$BUCKET" --object-name "$name" --force
      fi
@@ -289,7 +289,7 @@ El mismo túnel da `psql` contra `localhost:5432` para las migraciones.
    echo "copia $STAMP subida"
    ```
 
-5. `crontab -e`: `30 2 * * * /home/ubuntu/backup-familylink.sh >> /home/ubuntu/backup.log 2>&1`
+5. `crontab -e`: `30 2 * * * /home/ubuntu/backup-familytogether.sh >> /home/ubuntu/backup.log 2>&1`
    (antes de la purga de las 03:00).
 6. **Probar la restauración** antes de producción y cada pocos meses: bajar un `.dump`
    (`oci os object get`) y `pg_restore --clean --if-exists -d <base de prueba>` en otra máquina.
@@ -297,8 +297,8 @@ El mismo túnel da `psql` contra `localhost:5432` para las migraciones.
 ### 5. Mantenimiento mensual
 
 ```sh
-~/backup-familylink.sh                         # copia justo antes
-cd ~/familylink
+~/backup-familytogether.sh                         # copia justo antes
+cd ~/familytogether
 git -C ~/supabase pull                         # ver cambios de docker/ y fusionarlos a mano
 docker compose pull && docker compose up -d
 docker image prune -f

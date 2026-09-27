@@ -1,7 +1,7 @@
-# FamilyLink — Arquitectura (contrato entre servidor, núcleo y app)
+# Family Together — Arquitectura (contrato entre servidor, núcleo y app)
 
 **2026-09-27.** Este documento es el contrato: el servidor (`supabase/`), el núcleo
-(`FamilyLink.Core`) y la app (`FamilyLink.Mobile`) se escriben contra lo que dice aquí. Si algo
+(`FamilyTogether.Core`) y la app (`FamilyTogether.Mobile`) se escriben contra lo que dice aquí. Si algo
 cambia, se cambia aquí primero. La especificación funcional está en [ESPECIFICACION.md](ESPECIFICACION.md);
 las reglas de la constitución que aplican, en `constitution/CONSTITUCION-MOBILE.md` §10.
 
@@ -13,8 +13,8 @@ las reglas de la constitución que aplican, en `constitution/CONSTITUCION-MOBILE
 | `supabase/functions/notify` | Edge Function: calcula destinatarios y envía FCM (solo datos) | — |
 | `supabase/functions/link-account` | Edge Function: verifica id_token de Google/Microsoft y vincula | — |
 | `supabase/functions/recover-account` | Edge Function: recupera el usuario en un móvil nuevo | — |
-| `FamilyLink.Core` (net10.0) | Cliente de Supabase por HttpClient, cifrado, modelos, repositorios, cola local, zonas | Task Manager `TaskManager.Core` |
-| `FamilyLink.Mobile` (net10.0-android36.0) | .NET MAUI Android: páginas, mapa, QR, servicio de ubicación, FCM, avisos | Task Manager Mobile, Hiker |
+| `FamilyTogether.Core` (net10.0) | Cliente de Supabase por HttpClient, cifrado, modelos, repositorios, cola local, zonas | Task Manager `TaskManager.Core` |
+| `FamilyTogether.Mobile` (net10.0-android36.0) | .NET MAUI Android: páginas, mapa, QR, servicio de ubicación, FCM, avisos | Task Manager Mobile, Hiker |
 
 Sin SDK de Supabase: PostgREST (`/rest/v1`) y GoTrue (`/auth/v1`) con `HttpClient`, como Task Manager.
 
@@ -62,7 +62,7 @@ Sin SDK de Supabase: PostgREST (`/rest/v1`) y GoTrue (`/auth/v1`) con `HttpClien
 1. Un administrador crea la invitación: genera un par ECDH (`inv`), llama
    `create_invitation(group, inv_pub, inv_priv_enc)` con la privada cifrada con la clave del grupo.
    El servidor genera el **código** (8 caracteres de `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`), `expires_at`
-   = ahora + 5 min. El QR contiene `familylink://join?c=<CODIGO>`.
+   = ahora + 5 min. El QR contiene `familytogether://join?c=<CODIGO>`.
 2. Quien se une: `invitation_info(code)` → `inv_pub` (o error `expired` / `not_found`). Genera su par
    (`req`), guarda la privada en `SecureStorage` (`req_priv_<request_id>` tras la llamada), cifra su
    nombre visible con ECDH(`req_priv`, `inv_pub`) → `name_box`, y llama
@@ -187,15 +187,15 @@ ubicación consulta cada 60 s los eventos nuevos (SOS, zonas, solicitudes) y avi
   `distancia > r + m`, con `m = max(15 m, precisión)`; estado por zona guardado.
 - Batería con cada posición.
 
-## 9. API del núcleo (`FamilyLink.Core`) que usa la app
+## 9. API del núcleo (`FamilyTogether.Core`) que usa la app
 
-Espacio de nombres `FamilyLink.Core`. Todo asíncrono con `CancellationToken` opcional. Los errores
-de servidor llegan como `FamilyLinkException(string Code, string Message)` con `Code` = la clave de
+Espacio de nombres `FamilyTogether.Core`. Todo asíncrono con `CancellationToken` opcional. Los errores
+de servidor llegan como `FamilyTogetherException(string Code, string Message)` con `Code` = la clave de
 §6 o `network` / `unauthorized` / `server`.
 
 ```csharp
-// Configuración (generada desde familylink.local.props; vacía si no hay valores)
-public static partial class FamilyLinkConfig { string SupabaseUrl; string PublishableKey; string GoogleClientId; string GoogleRedirectScheme; string MicrosoftClientId; bool IsServerConfigured; }
+// Configuración (generada desde familytogether.local.props; vacía si no hay valores)
+public static partial class FamilyTogetherConfig { string SupabaseUrl; string PublishableKey; string GoogleClientId; string GoogleRedirectScheme; string MicrosoftClientId; bool IsServerConfigured; }
 
 public interface ISecureStore { Task<string?> GetAsync(string key); Task SetAsync(string key, string value); void Remove(string key); }
 

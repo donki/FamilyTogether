@@ -1,4 +1,4 @@
-// FamilyLink — Edge Function `recover-account` (ARQUITECTURA §2).
+// Family Together — Edge Function `recover-account` (ARQUITECTURA §2).
 //
 // POST /functions/v1/recover-account   Authorization: Bearer <JWT del usuario anonimo del movil NUEVO>
 //   { "provider": "google" | "microsoft", "id_token": "<id_token del proveedor>" }

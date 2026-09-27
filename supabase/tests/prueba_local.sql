@@ -1,11 +1,11 @@
--- FamilyLink — prueba local de las migraciones contra un PostgreSQL sin Supabase.
+-- Family Together — prueba local de las migraciones contra un PostgreSQL sin Supabase.
 --
 -- Simula lo minimo de Supabase (esquema auth con auth.users y auth.uid(), roles anon /
 -- authenticated / service_role, privilegios por defecto que concede Supabase y, si no hay
 -- pg_cron, un esquema cron de pega), aplica 01-04 DOS veces (tienen que ser relanzables) y
 -- ejercita los flujos con varios usuarios. Cualquier fallo corta el script con un error.
 --
---   psql -p 54317 -U postgres -d familylink_test -v ON_ERROR_STOP=1 -f supabase/tests/prueba_local.sql
+--   psql -p 54317 -U postgres -d familytogether_test -v ON_ERROR_STOP=1 -f supabase/tests/prueba_local.sql
 --
 -- OJO: borra y rehace los esquemas public, auth, cron y test de la base a la que se conecte.
 -- Usar una base de pruebas, nunca la de Supabase.
@@ -210,11 +210,11 @@ insert into auth.users (id) values (:'u1'), (:'u2'), (:'u3'), (:'u4'), (:'u5');
 \ir ../migrations/03_functions.sql
 \ir ../migrations/04_cron.sql
 
-select test.ok((select count(*) from cron.job where jobname like 'familylink_%') = 2,
+select test.ok((select count(*) from cron.job where jobname like 'familytogether_%') = 2,
                'pg_cron: dos tareas, sin duplicar al relanzar');
-select test.ok((select schedule from cron.job where jobname = 'familylink_purge_old_data') = '0 3 * * *',
+select test.ok((select schedule from cron.job where jobname = 'familytogether_purge_old_data') = '0 3 * * *',
                'pg_cron: purga diaria a las 03:00');
-select test.ok((select schedule from cron.job where jobname = 'familylink_expire') = '*/5 * * * *',
+select test.ok((select schedule from cron.job where jobname = 'familytogether_expire') = '*/5 * * * *',
                'pg_cron: caducidades cada 5 min');
 select test.ok((select bool_and(c.relrowsecurity) from pg_class c join pg_namespace s on s.oid = c.relnamespace
                 where s.nspname = 'public' and c.relkind = 'r')
