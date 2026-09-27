@@ -1,0 +1,102 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-android36.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>FamilyLink.Mobile</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Nombre visible (nombre de trabajo: el publico esta por decidir, ver ESPECIFICACION). -->
+    <ApplicationTitle>FamilyLink</ApplicationTitle>
+
+    <!-- Identificador (constitucion Mobile 1: com.socratic.[nombre-aplicacion]) -->
+    <ApplicationId>com.socratic.familylink</ApplicationId>
+
+    <!-- Version (constitucion Mobile 3: los dos valores en sincronia, esquema de fecha) -->
+    <ApplicationDisplayVersion>2026.09.27.00</ApplicationDisplayVersion>
+    <ApplicationVersion>2026092700</ApplicationVersion>
+
+    <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
+
+    <!-- Informacion del paquete -->
+    <PackageId>FamilyLink</PackageId>
+    <Title>FamilyLink</Title>
+    <Product>FamilyLink</Product>
+    <Description>Localizacion familiar: grupos cerrados, ultima posicion, recorridos, zonas y SOS, cifrado de extremo a extremo.</Description>
+    <Copyright>Copyright © 2026 Socratic</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>family;location;sos;android;maui;dotnet</PackageTags>
+    <Authors>Socratic</Authors>
+    <Company>Socratic</Company>
+
+    <!-- Versiones de plataforma -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+
+    <!-- Android (TFM con version Y TargetSdkVersion explicito) -->
+    <TargetSdkVersion>36</TargetSdkVersion>
+    <AndroidUseLatestPlatformSdk>false</AndroidUseLatestPlatformSdk>
+    <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
+
+    <AssemblyVersion>2026.9.27.0</AssemblyVersion>
+    <FileVersion>2026.9.27.0</FileVersion>
+  </PropertyGroup>
+
+  <!--
+    Ensamblados embebidos en cualquier despliegue, Debug y Release. Con Fast Deployment no viajan en
+    el APK y la app aborta al arrancar con "No assemblies found".
+  -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidLinkMode>SdkOnly</AndroidLinkMode>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Icono: marcador de posicion con dos personas, en blanco sobre el indigo de la marca. -->
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#3525CD" />
+
+    <!-- Splash nativo: solo el glifo, sobre el indigo de marca. -->
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#3525CD" BaseSize="180,180" />
+
+    <!-- Iconografia vectorial: MAUI rasteriza los SVG por densidad. -->
+    <MauiImage Include="Resources\Images\*" />
+
+    <!--
+      El mapa (map.html) y MapLibre GL JS 4.7.1 EMPAQUETADO (BSD-3, maplibre-LICENSE.txt): la app
+      no depende de un CDN para pintar el mapa (constitucion Mobile 10). Las novedades, tambien aqui.
+    -->
+    <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.2" />
+    <!-- Lector de QR de las invitaciones (MIT), el mismo que Task Manager. -->
+    <PackageReference Include="ZXing.Net.Maui.Controls" Version="0.10.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FamilyLink.Core\FamilyLink.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Ficheros compartidos por las apps sOCratic (una sola fuente de verdad). -->
+  <ItemGroup>
+    <Compile Include="..\..\Shared\ModernDialog.cs" Link="ModernDialog.cs" />
+  </ItemGroup>
+
+  <!--
+    La parte nativa de Android (servicio de ubicacion, FCM, avisos) trae sus propios paquetes NuGet
+    en este fichero, que mantiene quien escribe Platforms\Android.
+  -->
+  <Import Project="Platforms\Android\android.props" Condition="Exists('Platforms\Android\android.props')" />
+
+  <!-- Firma compartida por todas las apps sOCratic (constitucion Mobile 2). -->
+  <Import Project="..\..\Shared\signing.props" />
+
+</Project>

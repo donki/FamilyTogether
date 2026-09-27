@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:FamilyLink.Mobile.Localization"
+             x:Class="FamilyLink.Mobile.Pages.AboutPage"
+             Title="{loc:T MenuAbout}">
+
+    <!-- Estructura canonica de la pantalla Acerca de, la misma que Task Manager (Mobile 7): logo,
+         version, contacto, idioma, novedades, privacidad, licencia y aviso legal. -->
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <!-- Cabecera -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="30,25" Spacing="10">
+                    <Image Source="about_logo.png" HeightRequest="84" WidthRequest="84" HorizontalOptions="Center" />
+                    <Label Text="{loc:T AppName}"
+                           FontSize="26"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource OnPrimaryMuted}}"
+                           HorizontalOptions="Center" />
+                    <Label x:Name="VersionLabel" Style="{StaticResource HintText}" FontSize="15" HorizontalOptions="Center" />
+                    <Label Text="{loc:T AboutDescription}"
+                           Style="{StaticResource HintText}" HorizontalTextAlignment="Center" />
+                    <Label Text="{loc:T Publisher}" Style="{StaticResource HintText}" HorizontalOptions="Center" Margin="0,8,0,0" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Contacto -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="25,20" Spacing="12">
+                    <Label Text="{loc:T Contact}" Style="{StaticResource CardTitle}" />
+                    <Button Text="{loc:T WriteAuthor}"
+                            Style="{StaticResource OutlineButton}"
+                            ImageSource="ic_mail.png"
+                            ContentLayout="Left,8"
+                            Clicked="OnContactClicked"
+                            HorizontalOptions="Fill" />
+                    <Label Text="{loc:T ContactHint}" Style="{StaticResource HintText}"
+                           HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Idioma: en Acerca de tambien, como en todas las apps (Mobile 7). Con bandera
+                 dibujada, nunca emoji ni letras del pais (General 6.2). -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="25,20" Spacing="12">
+                    <Label Text="{loc:T LanguageTitle}" Style="{StaticResource CardTitle}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button Grid.Column="0" x:Name="SpanishButton" Text="Español" ImageSource="ic_flag_es.png"
+                                ContentLayout="Left,8" Style="{StaticResource LanguageButton}" Clicked="OnSpanishClicked" />
+                        <Button Grid.Column="1" x:Name="EnglishButton" Text="English" ImageSource="ic_flag_us.png"
+                                ContentLayout="Left,8" Style="{StaticResource LanguageButton}" Clicked="OnEnglishClicked" />
+                    </Grid>
+                    <Label Text="{loc:T LanguageHint}" Style="{StaticResource HintText}"
+                           HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Novedades (General 6.7): tambien desde aqui. -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="25,20" Spacing="12">
+                    <Label Text="{loc:T MenuWhatsNew}" Style="{StaticResource CardTitle}" />
+                    <Button Text="{loc:T WhatsNewOpen}"
+                            Style="{StaticResource OutlineButton}"
+                            ImageSource="ic_news.png"
+                            ContentLayout="Left,8"
+                            Clicked="OnWhatsNewClicked"
+                            HorizontalOptions="Fill" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Privacidad -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="25,20" Spacing="10">
+                    <Label Text="{loc:T Privacy}" Style="{StaticResource CardTitle}" TextColor="{StaticResource Success}" />
+                    <Label Style="{StaticResource BodyText}" FontSize="13" Text="{loc:T PrivacyText}" />
+                    <Button Text="{loc:T PrivacyPolicy}"
+                            Style="{StaticResource OutlineButton}"
+                            ImageSource="ic_open.png"
+                            ContentLayout="Left,8"
+                            Clicked="OnPrivacyClicked"
+                            HorizontalOptions="Fill" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Licencia -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="25,20" Spacing="10">
+                    <Label Text="{loc:T License}" Style="{StaticResource CardTitle}" />
+                    <Label Style="{StaticResource BodyText}" FontSize="13" Text="{loc:T LicenseText}" />
+                    <Label Text="{loc:T ThirdParty}" Style="{StaticResource HintText}" FontSize="11" />
+                    <Label Text="{loc:T LicenseLine}" Style="{StaticResource HintText}" FontSize="11" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Aviso legal: obligatorio y el ultimo, con las mismas palabras que en las demas apps. -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="25,20" Spacing="12">
+                    <Label Text="{loc:T LegalTitle}" Style="{StaticResource CardTitle}"
+                           TextColor="{StaticResource Danger}" />
+
+                    <Border BackgroundColor="{AppThemeBinding Light={StaticResource WarningSurfaceLight}, Dark={StaticResource WarningSurfaceDark}}"
+                            Stroke="Transparent"
+                            StrokeThickness="0"
+                            Padding="15">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="{loc:T LegalText1}" Style="{StaticResource BodyText}" FontSize="13" />
+                            <Label Text="{loc:T LegalText2}" Style="{StaticResource BodyText}" FontSize="13" />
+
+                            <Border BackgroundColor="{StaticResource Danger}" Stroke="Transparent"
+                                    StrokeThickness="0" Padding="12">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="6" />
+                                </Border.StrokeShape>
+                                <Label Text="{loc:T WarningText}"
+                                       FontSize="13"
+                                       FontAttributes="Bold"
+                                       TextColor="{StaticResource White}"
+                                       HorizontalOptions="Center"
+                                       HorizontalTextAlignment="Center" />
+                            </Border>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

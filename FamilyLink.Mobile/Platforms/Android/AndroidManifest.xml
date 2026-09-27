@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    enableOnBackInvokedCallback="false" (constitucion Mobile 7): con targetSdk 36, Android 16 activa
+    el «atras predictivo» y el boton de atras deja de llegar al Shell y a las paginas; la app se
+    cerraria desde cualquier pantalla. Hasta que MAUI lo soporte, se desactiva aqui.
+
+    Las actividades, el servicio de ubicacion, el de FCM y los receptores los declara el compilador
+    a partir de sus atributos [Activity], [Service] y [BroadcastReceiver] (ver cada .cs).
+  -->
+  <application android:allowBackup="false"
+               android:icon="@mipmap/appicon"
+               android:roundIcon="@mipmap/appicon_round"
+               android:supportsRtl="true"
+               android:enableOnBackInvokedCallback="false">
+
+    <!--
+      FCM se usa SOLO para Messaging (constitucion General 1.2 y Mobile 10): sin Analytics ni
+      Crashlytics. El paquete de Messaging no trae Analytics, pero si alguna dependencia lo
+      arrastrara en el futuro, estas dos lineas lo dejan apagado desde el primer arranque.
+    -->
+    <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true" />
+    <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
+    <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
+
+    <!-- Canal por defecto de FCM si llegara un mensaje con «notification» (no deberia: solo datos). -->
+    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="requests" />
+  </application>
+
+  <!--
+    Permisos (constitucion Mobile 4 y 10: el minimo imprescindible, cada uno con su funcion visible).
+    Los de ubicacion en segundo plano, servicio en primer plano de tipo location, notificaciones y
+    camara van declarados en Play Console, con video sin cortes y promocionados en la ficha.
+  -->
+
+  <!--
+    ACCESS_FINE_LOCATION: la funcion principal. Se comparte la posicion con el grupo al moverse
+    25 m o mas (FR-009) y las lecturas peores de 25 m se descartan (FR-010): con la ubicacion
+    aproximada (unos 2 km) no saldria ninguna.
+    ACCESS_COARSE_LOCATION: Android exige pedirla junto con la precisa desde Android 12; el
+    usuario puede conceder solo la aproximada y la app se lo explica y le lleva a Ajustes.
+  -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+  <!--
+    ACCESS_BACKGROUND_LOCATION: la posicion tiene que llegar al grupo tambien con la app cerrada y
+    tras reiniciar el movil (FR-009, HU3). A diferencia de Hiker, aqui el servicio se arranca solo
+    al encender el movil (BootReceiver) y se recrea si Android mata el proceso: en esos casos la app
+    no esta en pantalla y sin este permiso el servicio no recibiria ninguna posicion.
+  -->
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+  <!--
+    FOREGROUND_SERVICE + FOREGROUND_SERVICE_LOCATION: el servicio de ubicacion en primer plano con
+    su notificacion fija «Compartiendo tu ubicacion» (tipo location, obligatorio desde Android 14).
+    Sin el, Android deja de entregar posiciones a los pocos minutos de apagar la pantalla.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+  <!--
+    POST_NOTIFICATIONS (Android 13+): los avisos de SOS, de entrada y salida de zonas y de
+    solicitudes para unirse, y la notificacion fija del servicio de ubicacion.
+  -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <!--
+    RECEIVE_BOOT_COMPLETED: si el usuario estaba compartiendo su ubicacion, al reiniciar el movil
+    el servicio vuelve a arrancar solo. Sin esto, tras cada reinicio el grupo dejaria de ver su
+    posicion sin que nadie se enterase.
+  -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <!--
+    REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: el boton de la guia de ahorro de bateria (caso limite de
+    la especificacion) pide al usuario, con el dialogo del sistema, excluir la app de la
+    optimizacion. Es una app de localizacion familiar y de SOS: si el sistema la duerme, el grupo
+    deja de ver la posicion y los avisos llegan tarde. El usuario decide; nunca se pide solo.
+  -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+  <!--
+    INTERNET: enviar la posicion cifrada al servidor propio (Supabase), leer la de los demas, las
+    teselas del mapa (OpenFreeMap) y recibir los avisos por FCM.
+    ACCESS_NETWORK_STATE: saber si hay conexion antes de vaciar la cola local de posiciones; sin
+    red se guardan en el movil y se envian al volver con su hora original.
+  -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+  <!--
+    CAMERA: leer el QR de una invitacion a un grupo (HU1/HU2). Se pide al pulsar el boton de
+    escanear, no al arrancar; la imagen no se guarda ni sale del dispositivo.
+  -->
+  <uses-permission android:name="android.permission.CAMERA" />
+
+  <!--
+    WAKE_LOCK: un bloqueo parcial de CPU CORTO (con tiempo maximo) mientras se procesa cada
+    posicion y la consulta periodica de avisos, para que el envio no se quede a medias con la
+    pantalla apagada. No se mantiene la CPU despierta de forma continua (bateria, SC-005).
+  -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!--
+    No se declaran: USE_FULL_SCREEN_INTENT (el SOS es una notificacion de alta prioridad, no una
+    pantalla completa), ACCESS_NOTIFICATION_POLICY (saltarse No molestar lo decide el usuario en
+    el canal «SOS» de los ajustes de notificaciones) ni SCHEDULE_EXACT_ALARM.
+    La biblioteca de FCM anade por su cuenta com.google.android.c2dm.permission.RECEIVE, que es el
+    que permite recibir los mensajes push.
+  -->
+
+  <uses-feature android:name="android.hardware.location" android:required="false" />
+  <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+  <uses-feature android:name="android.hardware.location.network" android:required="false" />
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
+  <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+  <queries>
+    <!-- Boton de contacto de la pantalla Acerca de. -->
+    <intent>
+      <action android:name="android.intent.action.SENDTO" />
+      <data android:scheme="mailto" />
+    </intent>
+    <!-- Abrir el navegador del sistema para vincular Google o Microsoft. -->
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="https" />
+    </intent>
+  </queries>
+
+</manifest>

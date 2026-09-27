@@ -1,0 +1,22 @@
+[
+  {
+    "version": "2026.09.27.00",
+    "date": "2026-09-27",
+    "es": [
+      "Primera versión.",
+      "Crea grupos cerrados e invita con un código o un QR que caduca a los 5 minutos; un administrador aprueba cada entrada.",
+      "Mapa con la última posición, la hora y la batería de cada miembro, o «En pausa».",
+      "Tu posición se comparte al moverte 25 metros, también con la app cerrada; sin conexión se guarda y se envía después.",
+      "Recorridos de los últimos 30 días, zonas con avisos de entrada y salida, y SOS con cuenta atrás.",
+      "Nombres, zonas y coordenadas viajan cifrados: el servidor no puede leerlos."
+    ],
+    "en": [
+      "First release.",
+      "Create closed groups and invite with a code or a QR that expires after 5 minutes; an admin approves every request.",
+      "Map with each member's last position, time and battery, or \"Paused\".",
+      "Your position is shared when you move 25 metres, even with the app closed; offline it is stored and sent later.",
+      "Routes from the last 30 days, zones with arrival and departure alerts, and SOS with a countdown.",
+      "Names, zones and coordinates travel encrypted: the server cannot read them."
+    ]
+  }
+]

@@ -1,0 +1,24 @@
+.vs/
+bin/
+obj/
+*.tmp
+*.log
+
+# Firma y secretos (nunca al repositorio)
+*.keystore
+*-Signed.aab
+*-Signed.apk
+keystore.password.txt
+
+# Configuración local con identificadores y claves (se genera a partir de estos ficheros al compilar)
+familylink.local.props
+*.g.cs
+
+# Firebase: el google-services.json / las opciones van en familylink.local.props
+google-services.json
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+supabase/functions/.env
+releases/
