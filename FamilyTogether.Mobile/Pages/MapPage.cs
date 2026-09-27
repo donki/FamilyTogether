@@ -128,6 +128,7 @@ public sealed class MapPage : ContentPage
 
         _map.StartEvents();
         App.AppResumed += OnResumed;
+        App.MapFocusRequested += OnResumed;
         _timer ??= CreateTimer();
         _timer.Start();
         // Al abrir, el mapa se centra en mi posicion (no en el grupo entero): se deja marcado como
@@ -182,6 +183,7 @@ public sealed class MapPage : ContentPage
         _timer?.Stop();
         _map.StopEvents();
         App.AppResumed -= OnResumed;
+        App.MapFocusRequested -= OnResumed;
     }
 
     private IDispatcherTimer CreateTimer()

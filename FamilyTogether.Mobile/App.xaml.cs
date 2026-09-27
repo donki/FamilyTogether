@@ -125,6 +125,9 @@ public partial class App : Application
                     }
 
                     await shell.GoToAsync("//MapPage");
+                    // Con el mapa ya en pantalla no hay OnAppearing: que lo aplique ya, no en la
+                    // siguiente recarga (hasta 30 s).
+                    MapFocusRequested?.Invoke(null, EventArgs.Empty);
                     break;
             }
         }
@@ -139,6 +142,9 @@ public partial class App : Application
 
     /// <summary>Al abrir el mapa desde un aviso sin sitio: encuadrar a todo el grupo.</summary>
     public static bool PendingMapFit { get; set; }
+
+    /// <summary>Hay un <see cref="PendingMapFocus"/> o <see cref="PendingMapFit"/> nuevo para el mapa abierto.</summary>
+    public static event EventHandler? MapFocusRequested;
 
     private static Dictionary<string, string> ParseQuery(string query)
     {
