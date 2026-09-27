@@ -45,13 +45,15 @@ abajo es para comprobarlo o para rehacerlo.
 
 ## 2. Microsoft (Entra ID)
 
-**Estado: pendiente.** Se hace una sola vez y vale para cuentas personales (Outlook, Hotmail, Live)
-y de empresa.
+**Estado: hecho el 2026-09-27** con la opción A en ipssoft.com. Client ID
+`f20e0765-c1d0-478e-8a37-2688fffbc707`, ya puesto en `familytogether.local.props` y en el secreto
+`MICROSOFT_CLIENT_IDS` de las funciones. Lo que queda abajo es para comprobarlo o para rehacerlo.
+Se hace una sola vez y vale para cuentas personales (Outlook, Hotmail, Live) y de empresa.
 
 ### Opción A — lo hago yo con un script (≈ 2 min tuyos)
 
-Tengo el mismo script que se usó para Task Manager (`Mobile/TaskManager/tools/Registrar-Entra.ps1`).
-Lo lanzo con el nombre y la vuelta de Family Together y te sale un código: abres
+El script está en `tools/Registrar-Entra.ps1` (copia del de Task Manager, con el nombre y la vuelta
+de Family Together). Lo lanzo con `-Tenant ipssoft.com` y te sale un código: abres
 https://microsoft.com/devicelogin, lo escribes y apruebas **con la cuenta de ipssoft.com** (la que
 puede registrar aplicaciones; con la hotmail no deja). El script crea el registro y me devuelve el
 identificador. Dímelo y lo lanzo.
