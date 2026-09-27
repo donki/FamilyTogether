@@ -291,12 +291,16 @@ public class LocationSharingForegroundService : Service, ILocationListener
     /// <summary>¿Vale esta lectura? Precisión, antigüedad y distancia a la última enviada.</summary>
     private bool IsWorthSending(AndroidLocation location)
     {
-        if (!location.HasAccuracy || location.Accuracy > ThresholdMeters)
+        if (!location.HasAccuracy || location.Accuracy > LocationOutbox.CoarseMaxAccuracyMeters)
             return false;
 
         var at = DateTimeOffset.FromUnixTimeMilliseconds(location.Time);
         if (DateTimeOffset.UtcNow - at > MaxReadingAge)
             return false;
+
+        // Peor de 25 m: la cola decide si vale como aproximada (solo si en 10 min no ha habido otra).
+        if (location.Accuracy > ThresholdMeters)
+            return true;
 
         // La primera lectura válida de cada arranque se envía siempre: tras activar la compartición
         // o reiniciar el móvil, el grupo tiene que ver una posición reciente.
@@ -316,7 +320,7 @@ public class LocationSharingForegroundService : Service, ILocationListener
                 return;
 
             // Filtro rápido fuera del cerrojo; se repite dentro por si entró otra mientras tanto.
-            if (!location.HasAccuracy || location.Accuracy > ThresholdMeters)
+            if (!location.HasAccuracy || location.Accuracy > LocationOutbox.CoarseMaxAccuracyMeters)
                 return;
 
             await _work.WaitAsync().ConfigureAwait(false);
@@ -361,13 +365,18 @@ public class LocationSharingForegroundService : Service, ILocationListener
         // mientras compartía se envía, y lo registrado en pausa no llega nunca (FR-018).
         var groups = await SharingState.GetSharingGroupsAsync(family, online, GroupsMaxAgeOnReading).ConfigureAwait(false);
 
+        var coarse = accuracy > ThresholdMeters;
         if (groups.Count > 0)
         {
             try
             {
                 await outbox.EnqueueAsync(lat, lon, accuracy, ReadBattery(), at, groups).ConfigureAwait(false);
-                SharingState.LastSent = (lat, lon);
-                _sentInThisRun = true;
+                // Una aproximada no cuenta como referencia: la siguiente buena tiene que salir.
+                if (!coarse)
+                {
+                    SharingState.LastSent = (lat, lon);
+                    _sentInThisRun = true;
+                }
             }
             catch (Exception ex)
             {
@@ -379,8 +388,9 @@ public class LocationSharingForegroundService : Service, ILocationListener
         }
 
         // Zonas: solo en los grupos donde comparto (en pausa el grupo no debe saber dónde estoy).
+        // Con una lectura aproximada (peor de 25 m) no se evalúan zonas: daría entradas y salidas falsas.
         var zones = PlatformServiceLocator.Get<ZoneWatcher>();
-        if (zones is not null && groups.Count > 0)
+        if (zones is not null && groups.Count > 0 && !coarse)
         {
             try
             {

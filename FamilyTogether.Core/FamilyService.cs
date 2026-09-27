@@ -337,7 +337,7 @@ public sealed class FamilyService
         {
             var rows = await _client.SelectAsync<PositionRow>(
                 "positions",
-                $"select=user_id,recorded_at,battery,payload_enc&group_id=eq.{group:D}&user_id=eq.{user:D}" +
+                $"select=user_id,recorded_at,battery,payload_enc&group_id=eq.{group:D}&user_id=eq.{user:D}&coarse=is.false" +
                 $"&recorded_at=gte.{Stamp(from)}&recorded_at=lt.{Stamp(to)}&order=recorded_at.asc&limit={page}&offset={offset}",
                 cancellationToken).ConfigureAwait(false);
 
@@ -722,7 +722,7 @@ public sealed class FamilyService
 
     /// <summary>Inserta una tanda de posiciones de un grupo, ya cifradas con su clave.</summary>
     internal async Task<int> InsertPositionsAsync(
-        Guid group, IReadOnlyList<(double Lat, double Lon, double Acc, int Battery, DateTimeOffset At)> points,
+        Guid group, IReadOnlyList<(double Lat, double Lon, double Acc, int Battery, DateTimeOffset At, bool Coarse)> points,
         CancellationToken cancellationToken)
     {
         var key = await RequireKeyAsync(group).ConfigureAwait(false);
@@ -735,6 +735,7 @@ public sealed class FamilyService
             recorded_at = p.At.ToUniversalTime(),
             battery = (short)Math.Clamp(p.Battery, 0, 100),
             payload_enc = Crypto.Encrypt(Payloads.Position(p.Lat, p.Lon, p.Acc), key),
+            coarse = p.Coarse,
         }).ToList();
 
         await _client.InsertAsync("positions", rows, cancellationToken).ConfigureAwait(false);

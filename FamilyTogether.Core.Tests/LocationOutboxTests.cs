@@ -57,7 +57,7 @@ public class LocationOutboxTests : IDisposable
         var at = DateTimeOffset.UtcNow;
 
         await outbox.EnqueueAsync(40.0, -3.0, 8, 50, at, []);            // todo en pausa
-        await outbox.EnqueueAsync(40.0, -3.0, 30, 50, at, [a]);          // precision > 25 m
+        await outbox.EnqueueAsync(40.0, -3.0, 150, 50, at, [a]);         // precision > 100 m: nunca
         Assert.Equal(0, await outbox.PendingCountAsync());
 
         await outbox.EnqueueAsync(40.0, -3.0, 8, 50, at, [a]);
@@ -66,6 +66,32 @@ public class LocationOutboxTests : IDisposable
 
         await outbox.EnqueueAsync(40.0003, -3.0, 8, 50, at, [a]);        // ~33 m: si
         Assert.Equal(2, await outbox.PendingCountAsync());
+    }
+
+    [Fact]
+    public async Task AproximadaSoloSiEnDiezMinutosNoHaHabidoOtra()
+    {
+        var a = Guid.NewGuid();
+        var outbox = new LocationOutbox(_db);
+        var t0 = new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.Zero);
+
+        // En casa: la primera aproximada (100 m) entra, marcada; otra enseguida, no.
+        await outbox.EnqueueAsync(40.0, -3.0, 100, 50, t0, [a]);
+        await outbox.EnqueueAsync(40.0, -3.0, 90, 50, t0.AddMinutes(2), [a]);
+        var rows = await outbox.PeekAsync();
+        Assert.True(Assert.Single(rows).Coarse);
+
+        // Una buena entra aunque este cerca de la aproximada, y no va marcada.
+        await outbox.EnqueueAsync(40.0001, -3.0, 10, 50, t0.AddMinutes(3), [a]);
+        rows = await outbox.PeekAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.False(rows[1].Coarse);
+
+        // Con una buena hace menos de 10 minutos, la aproximada no entra; pasados 10, si.
+        await outbox.EnqueueAsync(40.0, -3.0, 60, 50, t0.AddMinutes(8), [a]);
+        Assert.Equal(2, await outbox.PendingCountAsync());
+        await outbox.EnqueueAsync(40.0, -3.0, 60, 50, t0.AddMinutes(14), [a]);
+        Assert.Equal(3, await outbox.PendingCountAsync());
     }
 
     [Fact]

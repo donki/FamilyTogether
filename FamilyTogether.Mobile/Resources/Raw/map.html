@@ -51,6 +51,13 @@
             attributionControl: false
         });
         map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+        // La atribucion de OpenFreeMap / OpenStreetMap es obligatoria (licencia ODbL), pero va
+        // plegada en el boton «i»: MapLibre la abre sola al cargar y tapaba el pie del mapa.
+        function foldAttribution() {
+            var a = document.querySelector('.maplibregl-ctrl-attrib');
+            if (a) { a.removeAttribute('open'); a.classList.remove('maplibregl-compact-show'); }
+        }
+        map.on('load', function () { foldAttribution(); setTimeout(foldAttribution, 500); });
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
         var styleReady = false;
@@ -92,6 +99,10 @@
             map.addSource('edit', { type: 'geojson', data: emptyFc() });
             map.addLayer({ id: 'edit-fill', type: 'fill', source: 'edit', paint: { 'fill-color': '#C2185B', 'fill-opacity': 0.18 } });
             map.addLayer({ id: 'edit-line', type: 'line', source: 'edit', paint: { 'line-color': '#C2185B', 'line-width': 2.5 } });
+
+            map.addSource('me', { type: 'geojson', data: emptyFc() });
+            map.addLayer({ id: 'me-accuracy', type: 'fill', source: 'me', paint: { 'fill-color': '#1E88E5', 'fill-opacity': 0.15 } });
+            map.addLayer({ id: 'me-accuracy-line', type: 'line', source: 'me', paint: { 'line-color': '#1E88E5', 'line-width': 1, 'line-opacity': 0.5 } });
 
             map.addSource('track', { type: 'geojson', data: emptyFc() });
             map.addLayer({
@@ -164,6 +175,23 @@
 
         function center(lat, lon, zoom) {
             map.easeTo({ center: [lon, lat], zoom: zoom || 15, duration: 600 });
+        }
+
+        // ---------- mi posicion (punto azul con su precision) ----------
+
+        var meMarker = null;
+        function setMe(lat, lon, acc) {
+            whenReady(function () {
+                ensureLayers();
+                map.getSource('me').setData({ type: 'FeatureCollection', features: [circle(lat, lon, Math.max(acc || 0, 5))] });
+                if (!meMarker) {
+                    var el = document.createElement('div');
+                    el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#1E88E5;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.4)';
+                    meMarker = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
+                } else {
+                    meMarker.setLngLat([lon, lat]);
+                }
+            });
         }
 
         // ---------- zonas ----------
@@ -269,6 +297,7 @@
         window.focusMember = focusMember;
         window.fitMembers = fitMembers;
         window.center = center;
+        window.setMe = setMe;
         window.setZones = setZones;
         window.fitZones = fitZones;
         window.setTapEnabled = setTapEnabled;

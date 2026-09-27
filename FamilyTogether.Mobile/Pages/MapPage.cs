@@ -130,7 +130,50 @@ public sealed class MapPage : ContentPage
         App.AppResumed += OnResumed;
         _timer ??= CreateTimer();
         _timer.Start();
+        // Al abrir, el mapa se centra en mi posicion (no en el grupo entero): se deja marcado como
+        // ya encuadrado para que la carga no lo mueva, y ShowMeAsync lo centra en cuanto hay lectura.
+        var centerOnMe = !_centeredOnMe && App.PendingMapFocus is null && !App.PendingMapFit;
+        if (centerOnMe)
+            _fitted = true;
         await LoadAsync();
+        await ShowMeAsync(centerOnMe);
+    }
+
+    private bool _centeredOnMe;
+
+    /// <summary>
+    /// Mi posicion en el mapa: punto azul con su circulo de precision. Con <paramref name="center"/>
+    /// (al abrir) se centra en ella; si no hay permiso o lectura, se encuadra al grupo como antes.
+    /// </summary>
+    private async Task ShowMeAsync(bool center)
+    {
+        (double Lat, double Lon, double Accuracy, DateTimeOffset At, bool Stale)? me = null;
+        try
+        {
+            if (_sharing is not null && await _sharing.CheckPermissionAsync() != LocationPermissionState.Denied)
+                me = await _sharing.GetCurrentOrLastAsync();
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Info($"mapa: no se pudo leer la posicion propia: {ex.Message}");
+        }
+
+        if (me is not { } p)
+        {
+            if (center)
+            {
+                _fitted = false;
+                await _map.RunAsync("fitMembers()");
+            }
+            return;
+        }
+
+        await _map.RunAsync($"setMe({MapView.Num(p.Lat)}, {MapView.Num(p.Lon)}, {MapView.Num(p.Accuracy)})");
+        if (center)
+        {
+            _centeredOnMe = true;
+            await _map.RunAsync($"center({MapView.Num(p.Lat)}, {MapView.Num(p.Lon)}, 15)");
+        }
     }
 
     protected override void OnDisappearing()
@@ -145,7 +188,11 @@ public sealed class MapPage : ContentPage
     {
         var timer = Dispatcher.CreateTimer();
         timer.Interval = RefreshEvery;
-        timer.Tick += async (_, _) => await LoadAsync(quiet: true);
+        timer.Tick += async (_, _) =>
+        {
+            await LoadAsync(quiet: true);
+            await ShowMeAsync(center: false);
+        };
         return timer;
     }
 

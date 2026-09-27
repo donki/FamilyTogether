@@ -19,6 +19,12 @@ namespace FamilyTogether.Core;
 public sealed class LocationOutbox
 {
     public const double MaxAccuracyMeters = 25;
+
+    /// <summary>Peor precision admitida como aproximada, cuando no hay otra (ver EnqueueAsync).</summary>
+    public const double CoarseMaxAccuracyMeters = 100;
+
+    /// <summary>Tiempo sin lecturas buenas tras el que se admite una aproximada, y entre aproximadas.</summary>
+    public static readonly TimeSpan CoarseAfter = TimeSpan.FromMinutes(10);
     public const double MinDistanceMeters = 25;
 
     /// <summary>Filas por peticion al enviar.</summary>
@@ -48,6 +54,9 @@ public sealed class LocationOutbox
         /// <summary>Hora de la lectura, en ticks UTC.</summary>
         public long AtUtcTicks { get; set; }
 
+        /// <summary>Lectura peor de 25 m aceptada porque no habia otra (ver <see cref="EnqueueAsync"/>).</summary>
+        public bool Coarse { get; set; }
+
         /// <summary>Grupos a los que aun falta enviarla, separados por comas.</summary>
         public string Groups { get; set; } = "";
 
@@ -70,6 +79,10 @@ public sealed class LocationOutbox
         public double Lat { get; set; }
         public double Lon { get; set; }
         public string Groups { get; set; } = "";
+
+        /// <summary>Ultima lectura buena (25 m o mejor) y ultima aproximada, en ticks UTC.</summary>
+        public long FineAtUtcTicks { get; set; }
+        public long CoarseAtUtcTicks { get; set; }
     }
 
     private async Task InitAsync()
@@ -90,15 +103,28 @@ public sealed class LocationOutbox
         double lat, double lon, double accuracy, int battery, DateTimeOffset at,
         IReadOnlyList<Guid> sharingGroups, CancellationToken cancellationToken = default)
     {
-        if (sharingGroups.Count == 0 || accuracy > MaxAccuracyMeters || double.IsNaN(lat) || double.IsNaN(lon))
+        if (sharingGroups.Count == 0 || accuracy > CoarseMaxAccuracyMeters || double.IsNaN(lat) || double.IsNaN(lon))
             return;
 
         await InitAsync().ConfigureAwait(false);
 
         var groups = string.Join(',', sharingGroups.Distinct().Order().Select(g => g.ToString("D")));
         var last = await _db.FindAsync<LastRow>(1).ConfigureAwait(false);
-        if (last is not null && last.Groups == groups && Geo.DistanceMeters(last.Lat, last.Lon, lat, lon) < MinDistanceMeters)
+        var coarse = accuracy > MaxAccuracyMeters;
+        if (coarse)
+        {
+            // Aproximada (decision de Josep, 2026-09-27): solo si en 10 minutos no ha habido ninguna
+            // buena ni otra aproximada. En interiores la red da unos 100 m y sin esto el grupo no te
+            // veria nunca. No entra en el historial ni en las zonas.
+            if (last is not null && last.Groups == groups &&
+                (at.UtcTicks - last.FineAtUtcTicks < CoarseAfter.Ticks || at.UtcTicks - last.CoarseAtUtcTicks < CoarseAfter.Ticks))
+                return;
+        }
+        else if (last is not null && last.Groups == groups && last.FineAtUtcTicks > 0 &&
+                 Geo.DistanceMeters(last.Lat, last.Lon, lat, lon) < MinDistanceMeters)
+        {
             return;
+        }
 
         await _db.InsertAsync(new OutboxRow
         {
@@ -108,9 +134,24 @@ public sealed class LocationOutbox
             Battery = battery,
             AtUtcTicks = at.UtcTicks,
             Groups = groups,
+            Coarse = coarse,
         }).ConfigureAwait(false);
 
-        await _db.InsertOrReplaceAsync(new LastRow { Id = 1, Lat = lat, Lon = lon, Groups = groups }).ConfigureAwait(false);
+        // La referencia para la distancia minima es la ultima lectura buena: una aproximada no debe
+        // impedir que la siguiente buena salga aunque este cerca.
+        var next = last ?? new LastRow { Id = 1 };
+        next.Groups = groups;
+        if (coarse)
+        {
+            next.CoarseAtUtcTicks = at.UtcTicks;
+        }
+        else
+        {
+            next.Lat = lat;
+            next.Lon = lon;
+            next.FineAtUtcTicks = at.UtcTicks;
+        }
+        await _db.InsertOrReplaceAsync(next).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -144,7 +185,7 @@ public sealed class LocationOutbox
                     {
                         sent += await service.InsertPositionsAsync(
                             group,
-                            [.. forGroup.Select(r => (r.Lat, r.Lon, r.Accuracy, r.Battery, r.At))],
+                            [.. forGroup.Select(r => (r.Lat, r.Lon, r.Accuracy, r.Battery, r.At, r.Coarse))],
                             cancellationToken).ConfigureAwait(false);
                     }
                     catch (FamilyTogetherException ex) when (ex.IsNetwork || ex.Code == FamilyTogetherException.Server)
