@@ -111,11 +111,55 @@ public class TrackCleanerTests
     {
         // A la tienda, 600 m, y vuelta, con una lectura cada 30 m (andando).
         var go = Enumerable.Range(0, 21).Select(i => P(i * 30, 0, i * 0.4));
-        var back = Enumerable.Range(1, 20).Select(i => P(600 - i * 30, 3, 20 + i * 0.4));
+        var back = Enumerable.Range(1, 20).Select(i => P(600 - i * 30, 3, 8 + i * 0.4));   // sin pararse en la tienda
         var track = go.Concat(back).ToList();
 
         var clean = TrackCleaner.Clean(track);
 
         Assert.Contains(clean, p => X(p) > 550);
+    }
+
+    [Fact]
+    public void Tarde_entera_en_casa_con_ruido_de_la_red_es_una_parada()
+    {
+        // Lo del Xiaomi del 2026-09-27: quieto de 19:13 a 23:39 con lecturas cada ~5 min que bailan
+        // 150-250 m y, de vez en cuando, saltos de 1 km al otro lado del rio que duran varias lecturas.
+        var random = new Random(4);
+        var track = new List<TrackPoint>();
+        for (var k = 0; k < 56; k++)
+        {
+            var minutes = k * 4.8;
+            if (k % 13 is 5 or 6)
+                track.Add(P(700 + random.NextDouble() * 300, -800 - random.NextDouble() * 200, minutes, 20));
+            else
+                track.Add(P(random.NextDouble() * 400 - 200, random.NextDouble() * 400 - 200, minutes, 20));
+        }
+
+        var clean = TrackCleaner.CleanWithStops(track);
+
+        var stop = Assert.Single(clean.Stops);
+        Assert.True(stop.To - stop.From > TimeSpan.FromHours(4));
+        Assert.True(clean.Points.Count <= 3, $"quedan {clean.Points.Count} puntos");
+        Assert.All(clean.Points, p => Assert.True(Math.Abs(X(p)) < 300));
+    }
+
+    [Fact]
+    public void Parada_y_luego_paseo_se_pintan_parada_y_linea()
+    {
+        var home = Enumerable.Range(0, 8).Select(i => P(i % 2 * 60, i % 3 * 50, i * 3, 20));   // 21 min en casa
+        var walk = Enumerable.Range(1, 12).Select(i => P(i * 80, 0, 21 + i));                  // y se va andando
+        var clean = TrackCleaner.CleanWithStops([.. home, .. walk]);
+
+        Assert.Single(clean.Stops);
+        Assert.InRange(clean.Points.Count, 10, 13);   // la parada (con las primeras lecturas a < 200 m) y el paseo
+        Assert.True(X(clean.Points[^1]) > 900);
+    }
+
+    [Fact]
+    public void Paseo_lento_de_cinco_minutos_no_es_parada()
+    {
+        var track = Enumerable.Range(0, 6).Select(i => P(i * 30, 0, i)).ToList();
+
+        Assert.Empty(TrackCleaner.CleanWithStops(track).Stops);
     }
 }

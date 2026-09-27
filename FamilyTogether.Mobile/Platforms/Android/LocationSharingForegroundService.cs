@@ -21,7 +21,11 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// <c>GPS_PROVIDER</c> y <c>NETWORK_PROVIDER</c>, cada uno con <c>minDistance = 25 m</c> y
 /// <c>minTime = 30 s</c>: el sistema no despierta a la app mientras el móvil no se mueve, y moviéndose
 /// no entrega más de una lectura cada medio minuto por proveedor (batería, SC-005).</para>
-/// <para><b>Por cada lectura válida</b> (precisión ≤ 25 m, reciente y a ≥ 25 m de la última
+/// <para><b>Qué entra en el historial</b> (2026-09-28, <see cref="ReadingPolicy"/>): solo el GPS de
+/// 25 m o mejor con el móvil moviéndose (sensor de movimiento significativo,
+/// <see cref="SignificantMotion"/>, o velocidad del GPS de ir andando). La red (wifi y antenas) y el
+/// GPS con el móvil quieto van como aproximadas: solo la última posición del mapa.</para>
+/// <para><b>Por cada lectura válida</b> (reciente y, si es buena, a ≥ 25 m de la última
 /// enviada): se calculan los grupos donde comparto en ese momento, se encola en
 /// <see cref="LocationOutbox"/> con su hora original, se vacía la cola si hay red, y se evalúan las
 /// zonas (<see cref="ZoneWatcher"/>) informando de cada entrada o salida.</para>
@@ -74,6 +78,8 @@ public class LocationSharingForegroundService : Service, ILocationListener
     private bool _listening;
     private bool _sentInThisRun;
     private DateTimeOffset _lastKeyShares = DateTimeOffset.MinValue;
+    private readonly SignificantMotion _motion = new();
+    private DateTimeOffset _lastStillLog = DateTimeOffset.MinValue;
 
     // ==================================================================================
     //  Arranque y parada (desde LocationSharing y BootReceiver)
@@ -244,6 +250,8 @@ public class LocationSharingForegroundService : Service, ILocationListener
 
             if (!_listening)
                 NativeLog.Warn("Ni GPS ni red disponibles en este dispositivo.");
+            else
+                _motion.Start(this);
         }
         catch (Java.Lang.SecurityException ex)
         {
@@ -263,6 +271,7 @@ public class LocationSharingForegroundService : Service, ILocationListener
         if (!_listening)
             return;
 
+        _motion.Stop();
         try
         {
             _locationManager?.RemoveUpdates(this);
@@ -288,28 +297,41 @@ public class LocationSharingForegroundService : Service, ILocationListener
 
     public void OnStatusChanged(string? provider, [global::Android.Runtime.GeneratedEnum] Availability status, Bundle? extras) { }
 
-    /// <summary>¿Vale esta lectura? Precisión, antigüedad y distancia a la última enviada.</summary>
-    private bool IsWorthSending(AndroidLocation location)
+    /// <summary>
+    /// ¿Qué se hace con esta lectura? (<see cref="ReadingPolicy"/>, FR-010 del 2026-09-28): solo el
+    /// GPS de 25 m o mejor, con el móvil moviéndose, entra en el historial; la red y el GPS con el
+    /// móvil quieto solo actualizan la última posición (aproximada). Además: antigüedad y distancia
+    /// a la última enviada.
+    /// </summary>
+    private ReadingKind Classify(AndroidLocation location)
     {
-        if (!location.HasAccuracy || location.Accuracy > LocationOutbox.CoarseMaxAccuracyMeters)
-            return false;
+        if (!location.HasAccuracy)
+            return ReadingKind.Discard;
 
         var at = DateTimeOffset.FromUnixTimeMilliseconds(location.Time);
-        if (DateTimeOffset.UtcNow - at > MaxReadingAge)
-            return false;
+        var now = DateTimeOffset.UtcNow;
+        if (now - at > MaxReadingAge)
+            return ReadingKind.Discard;
 
-        // Peor de 25 m: la cola decide si vale como aproximada (solo si en 10 min no ha habido otra).
-        if (location.Accuracy > ThresholdMeters)
-            return true;
+        double? speed = location.HasSpeed ? location.Speed : null;
+        var firstOfRun = !_sentInThisRun || SharingState.LastSent is null;
+        var kind = ReadingPolicy.Classify(location.Provider, location.Accuracy, speed, _motion.Available, _motion.LastMotion, now, firstOfRun);
 
-        // La primera lectura válida de cada arranque se envía siempre: tras activar la compartición
-        // o reiniciar el móvil, el grupo tiene que ver una posición reciente.
-        if (!_sentInThisRun || SharingState.LastSent is not { } last)
-            return true;
+        if (kind == ReadingKind.Coarse && location.Provider == LocationManager.GpsProvider &&
+            location.Accuracy <= ThresholdMeters && now - _lastStillLog > TimeSpan.FromMinutes(10))
+        {
+            _lastStillLog = now;
+            NativeLog.Info($"GPS de {location.Accuracy:F0} m con el móvil quieto: aproximada, fuera del historial.");
+        }
 
+        if (kind != ReadingKind.Fine || firstOfRun || SharingState.LastSent is not { } last)
+            return kind;
+
+        // La cola decide si una aproximada vale (solo si en 10 min no ha habido otra); una buena
+        // tiene que estar a 25 m o más de la última enviada.
         var results = new float[1];
         AndroidLocation.DistanceBetween(last.Lat, last.Lon, location.Latitude, location.Longitude, results);
-        return results[0] >= ThresholdMeters;
+        return results[0] >= ThresholdMeters ? ReadingKind.Fine : ReadingKind.Discard;
     }
 
     private async Task ProcessReadingAsync(AndroidLocation location)
@@ -327,11 +349,12 @@ public class LocationSharingForegroundService : Service, ILocationListener
             AcquireWakeLock();
             try
             {
-                if (!IsWorthSending(location))
+                var kind = Classify(location);
+                if (kind == ReadingKind.Discard)
                     return;
 
                 LastFix = location;
-                await HandleReadingAsync(location).ConfigureAwait(false);
+                await HandleReadingAsync(location, kind == ReadingKind.Coarse).ConfigureAwait(false);
             }
             finally
             {
@@ -345,7 +368,7 @@ public class LocationSharingForegroundService : Service, ILocationListener
         }
     }
 
-    private async Task HandleReadingAsync(AndroidLocation location)
+    private async Task HandleReadingAsync(AndroidLocation location, bool coarse)
     {
         var family = PlatformServiceLocator.Get<FamilyService>();
         var outbox = PlatformServiceLocator.Get<LocationOutbox>();
@@ -365,12 +388,11 @@ public class LocationSharingForegroundService : Service, ILocationListener
         // mientras compartía se envía, y lo registrado en pausa no llega nunca (FR-018).
         var groups = await SharingState.GetSharingGroupsAsync(family, online, GroupsMaxAgeOnReading).ConfigureAwait(false);
 
-        var coarse = accuracy > ThresholdMeters;
         if (groups.Count > 0)
         {
             try
             {
-                await outbox.EnqueueAsync(lat, lon, accuracy, ReadBattery(), at, groups).ConfigureAwait(false);
+                await outbox.EnqueueAsync(lat, lon, accuracy, ReadBattery(), at, groups, coarse).ConfigureAwait(false);
                 // Una aproximada no cuenta como referencia: la siguiente buena tiene que salir.
                 if (!coarse)
                 {
@@ -388,7 +410,8 @@ public class LocationSharingForegroundService : Service, ILocationListener
         }
 
         // Zonas: solo en los grupos donde comparto (en pausa el grupo no debe saber dónde estoy).
-        // Con una lectura aproximada (peor de 25 m) no se evalúan zonas: daría entradas y salidas falsas.
+        // Con una lectura aproximada (red, GPS peor de 25 m o con el móvil quieto) no se evalúan
+        // zonas: daría entradas y salidas falsas.
         var zones = PlatformServiceLocator.Get<ZoneWatcher>();
         if (zones is not null && groups.Count > 0 && !coarse)
         {

@@ -1,5 +1,20 @@
 # Changelog — Family Together
 
+## 2026.09.28.00
+
+- **Causa del historial ruidoso, atacada en origen** (el Xiaomi estuvo quieto en casa toda la tarde
+  del 27 y el historial dibujó 4 horas de paseos de 1 km): `ReadingPolicy` decide cada lectura.
+  Las del proveedor de red (wifi y antenas) **nunca** entran en el historial ni en las zonas: van
+  como aproximadas (solo la última posición del mapa). Solo el GPS de 25 m o mejor entra, y solo
+  si el móvil se mueve.
+- **Quietud sin Google Play Services**: sensor `TYPE_SIGNIFICANT_MOTION` (de disparo único, lo
+  vigila el concentrador de sensores; bajo consumo). Sin disparo en 5 min y sin velocidad de GPS de
+  andar (1,4 m/s) → el GPS es deriva y va como aproximada. Sin el sensor, como antes.
+- **Paradas en el dibujo**: 10 min o más en unos 150 m (con hasta 5 lecturas seguidas fuera
+  toleradas como ruido) se pintan como un punto de parada con su hora al tocarlo, no como líneas.
+- Tests: política de lecturas, cola con aproximada forzada, tarde entera en casa con ruido,
+  parada y paseo, ida y vuelta real.
+
 ## 2026.09.27.04
 
 - **Historial colgado en «Ajustando…»** (visto en el Xiaomi): `overpass.kumi.systems` no contesta

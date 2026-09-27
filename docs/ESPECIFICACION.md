@@ -47,7 +47,7 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
 | FR-007 | Unirse genera una solicitud; aprueba o rechaza un administrador; se avisa a todos los administradores. |
 | FR-008 | Nombrar y quitar administradores, expulsar; siempre al menos un administrador. |
 | FR-009 | Enviar la posición al desplazarse ≥ 25 m, también en segundo plano o con la app cerrada. |
-| FR-010 | Descartar lecturas con precisión peor que 25 m. |
+| FR-010 | Solo entran en el historial y en las zonas las lecturas del **GPS** de 25 m o mejor **con el móvil moviéndose**; las de red (wifi, antenas), las del GPS peores de 25 m (hasta 100) o con el móvil quieto solo actualizan la última posición del mapa (aproximadas). |
 | FR-011 | Enviar la batería con cada posición. |
 | FR-012 | Mapa: última posición, hora, batería o «En pausa» por miembro. |
 | FR-013 | Historial con borrado automático al superar la retención. |
@@ -117,6 +117,11 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   con la red de OpenStreetMap pedida a Overpass **por teselas fijas de 0,02°**, nunca el recorrido;
   caché de 30 días. Lo que no encaja va recto; nunca un rodeo inventado. Interruptor en Ajustes,
   encendido por defecto. Solo cambia el dibujo: no se guarda ni se reescribe nada.
+- **FR-010 en origen (2026-09-28)**: con el Xiaomi quieto en casa toda la tarde el historial
+  dibujó 4 h de paseos falsos. Las lecturas de red nunca entran en el historial (van como
+  aproximadas) y el GPS solo si el móvil se mueve, según el sensor de movimiento significativo
+  (sin Google Play Services; si no lo hay, como antes) o la velocidad del GPS. En el dibujo, una
+  parada de 10 min o más en unos 150 m es un punto.
 - **Traza limpia al dibujar (2026-09-27)**: se quitan los saltos de ida y vuelta imposibles (más de
   50 km/h en un salto que vuelve) y las paradas se juntan en un punto; el ajuste a calles tiene
   tiempo máximo y, si no llega, se queda recto con aviso.

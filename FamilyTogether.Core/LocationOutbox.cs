@@ -99,9 +99,11 @@ public sealed class LocationOutbox
     /// Encola una lectura para los grupos que comparten ahora. Sin grupos, o si no pasa los
     /// filtros de precision y distancia, no se guarda nada.
     /// </summary>
+    /// <param name="coarse">Aproximada aunque la precision diga otra cosa (lectura de red, o del
+    /// GPS con el movil quieto: <see cref="ReadingPolicy"/>). Sin valor, la decide la precision.</param>
     public async Task EnqueueAsync(
         double lat, double lon, double accuracy, int battery, DateTimeOffset at,
-        IReadOnlyList<Guid> sharingGroups, CancellationToken cancellationToken = default)
+        IReadOnlyList<Guid> sharingGroups, bool? coarse = null, CancellationToken cancellationToken = default)
     {
         if (sharingGroups.Count == 0 || accuracy > CoarseMaxAccuracyMeters || double.IsNaN(lat) || double.IsNaN(lon))
             return;
@@ -110,8 +112,8 @@ public sealed class LocationOutbox
 
         var groups = string.Join(',', sharingGroups.Distinct().Order().Select(g => g.ToString("D")));
         var last = await _db.FindAsync<LastRow>(1).ConfigureAwait(false);
-        var coarse = accuracy > MaxAccuracyMeters;
-        if (coarse)
+        var isCoarse = coarse ?? accuracy > MaxAccuracyMeters;
+        if (isCoarse)
         {
             // Aproximada (decision de Josep, 2026-09-27): solo si en 10 minutos no ha habido ninguna
             // buena ni otra aproximada. En interiores la red da unos 100 m y sin esto el grupo no te
@@ -134,14 +136,14 @@ public sealed class LocationOutbox
             Battery = battery,
             AtUtcTicks = at.UtcTicks,
             Groups = groups,
-            Coarse = coarse,
+            Coarse = isCoarse,
         }).ConfigureAwait(false);
 
         // La referencia para la distancia minima es la ultima lectura buena: una aproximada no debe
         // impedir que la siguiente buena salga aunque este cerca.
         var next = last ?? new LastRow { Id = 1 };
         next.Groups = groups;
-        if (coarse)
+        if (isCoarse)
         {
             next.CoarseAtUtcTicks = at.UtcTicks;
         }

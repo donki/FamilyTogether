@@ -1,5 +1,21 @@
 [
   {
+    "version": "2026.09.28.00",
+    "date": "2026-09-28",
+    "es": [
+      "El historial ya no se llena de paseos falsos cuando el móvil está quieto: las posiciones por wifi y antenas y las del GPS con el móvil parado solo actualizan dónde te ven en el mapa, no tus recorridos.",
+      "El móvil sabe si se mueve con su sensor de movimiento, que gasta muy poco; si no lo tiene, todo sigue como antes.",
+      "En el historial, una parada larga (10 minutos o más en el mismo sitio) se ve como un punto; tócalo para ver de qué hora a qué hora.",
+      "Si tu historial de estos días tiene recorridos que no hiciste, bórralo con «Borrar mi historial» en Ajustes o con la papelera de Historial."
+    ],
+    "en": [
+      "History no longer fills up with fake walks while the phone is still: Wi-Fi and cell positions, and GPS ones while the phone is not moving, only update where you appear on the map, not your routes.",
+      "The phone knows whether it is moving with its motion sensor, which uses very little battery; without that sensor everything works as before.",
+      "In History, a long stop (10 minutes or more in the same place) shows as a single point; tap it to see from what time to what time.",
+      "If your history from these days has routes you never made, delete it with \"Delete my history\" in Settings or with the bin in History."
+    ]
+  },
+  {
     "version": "2026.09.27.04",
     "date": "2026-09-27",
     "es": [

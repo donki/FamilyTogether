@@ -186,7 +186,18 @@ ubicación consulta cada 60 s los eventos nuevos (SOS, zonas, solicitudes) y avi
 
 - Servicio en primer plano de tipo `location` (el de Hiker), `LocationManager`/fused del sistema
   **sin Google Play Services**: `GPS_PROVIDER` y `NETWORK_PROVIDER` con `minDistance = 25 m`.
-- Se descartan lecturas con precisión > 25 m. Se envía si hay ≥ 25 m desde la última enviada.
+- **Qué entra en el historial (2026-09-28, `ReadingPolicy`)**: precisión peor de 100 m → fuera.
+  Proveedor distinto de `gps` (red: wifi y antenas; pasivo) → **aproximada siempre**, diga lo que
+  diga su precisión. GPS peor de 25 m → aproximada. GPS de 25 m o mejor → buena **solo si el móvil
+  se mueve**: sensor `TYPE_SIGNIFICANT_MOTION` disparado en los últimos 5 min o velocidad del GPS
+  ≥ 1,4 m/s; si no, deriva → aproximada. Sin ese sensor, como antes (el GPS bueno entra). La
+  primera buena de cada arranque del servicio entra siempre. Una buena se envía si hay ≥ 25 m desde
+  la última enviada; una aproximada, si en 10 min no ha habido otra ni una buena
+  (`LocationOutbox.EnqueueAsync(..., coarse)`).
+- **Sensor de movimiento significativo** (`SignificantMotion`): de disparo único y de activación,
+  lo vigila el concentrador de sensores del chip y solo despierta a la app al detectar que el
+  usuario cambia de sitio; se vuelve a armar tras cada disparo. Android lo exige de bajo consumo
+  (décimas de mA; el log de arranque escribe su nombre y su consumo declarado).
 - Cada lectura válida va a la **cola local** (SQLite) con la hora original y **la lista de grupos
   que comparten en ese momento** (así la pausa se cumple aunque se envíe más tarde). Al enviar se
   cifra una fila por grupo con la clave de cada uno.
@@ -346,6 +357,10 @@ Los textos visibles de los avisos los monta la app con su localización a partir
   Android el tiempo agotado llega como `WebException: Socket closed`, no como cancelación: se captura
   todo lo que no sea cancelar desde fuera). Todo queda en logcat (`FamilyTogether`, «core: Overpass
   …»).
+- **Paradas en el dibujo** (`TrackCleaner.CleanWithStops`): lecturas que se quedan a menos de
+  150 m de su centro durante 10 min o más (hasta 5 seguidas fuera se toman por ruido) → un punto de
+  parada (aro índigo, con «Parada de HH:mm a HH:mm» al tocarlo) en vez de líneas. Con 200 m una ida
+  y vuelta andando de 600 m se tomaba por parada.
 - **Limpieza antes de dibujar** (`TrackCleaner`, también con el ajuste apagado): excursión = salto
   de más de 300 m que en ≤ 5 lecturas vuelve de otro salto igual cerca del punto de partida → se
   quita entera, **sin mirar la velocidad** (en el Xiaomi las puntas llegaban con minutos entre

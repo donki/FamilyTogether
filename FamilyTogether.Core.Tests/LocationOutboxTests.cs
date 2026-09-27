@@ -109,6 +109,17 @@ public class LocationOutboxTests : IDisposable
         Assert.Equal(2, await outbox.PendingCountAsync());
     }
 
+    [Fact]
+    public async Task LecturaDeRedConBuenaPrecisionVaComoAproximada()
+    {
+        var a = Guid.NewGuid();
+        var outbox = new LocationOutbox(_db);
+
+        await outbox.EnqueueAsync(40.0, -3.0, 8, 50, DateTimeOffset.UtcNow, [a], coarse: true);
+
+        Assert.True(Assert.Single(await outbox.PeekAsync()).Coarse);
+    }
+
     /// <summary>Servidor falso: la sesion anonima y la RPC clear_my_history (o un fallo).</summary>
     private sealed class FakeServer(bool fail) : HttpMessageHandler
     {

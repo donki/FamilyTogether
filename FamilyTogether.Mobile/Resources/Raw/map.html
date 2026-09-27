@@ -30,6 +30,7 @@
             padding: 1px 6px; border-radius: 8px; background: rgba(53,37,205,.85); color: #FFFFFF;
             font: 12px sans-serif; white-space: nowrap;
         }
+        .fl-stop { width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; border: 5px solid #3525CD; box-shadow: 0 1px 4px rgba(0,0,0,.5); box-sizing: border-box; }
         .fl-end { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
         .fl-edit-center { width: 14px; height: 14px; border-radius: 50%; background: #3525CD; border: 3px solid #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
     </style>
@@ -287,6 +288,17 @@
             return new maplibregl.Marker({ element: el }).setLngLat(pos).addTo(map);
         }
 
+        // Paradas largas del historial: [[lat, lon, texto], ...]. Un punto con aro; al tocarlo, el texto.
+        function addStops(stops) {
+            (stops || []).forEach(function (s) {
+                var el = document.createElement('div');
+                el.className = 'fl-stop';
+                var marker = new maplibregl.Marker({ element: el }).setLngLat([s[1], s[0]]);
+                if (s[2]) marker.setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setText(s[2]));
+                trackMarkers.push(marker.addTo(map));
+            });
+        }
+
         function clearTrack() {
             trackMarkers.forEach(function (m) { m.remove(); });
             trackMarkers = [];
@@ -305,6 +317,7 @@
         window.setEditRadius = setEditRadius;
         window.setTrack = setTrack;
         window.clearTrack = clearTrack;
+        window.addStops = addStops;
         window.takeEvents = takeEvents;
         window.mapReady = true;
     </script>

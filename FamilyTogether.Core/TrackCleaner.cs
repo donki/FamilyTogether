@@ -29,12 +29,94 @@ public static class TrackCleaner
     /// <summary>Radio minimo de una parada, en metros.</summary>
     internal const double MinStopRadius = 15;
 
-    public static IReadOnlyList<TrackPoint> Clean(IReadOnlyList<TrackPoint> points)
+    /// <summary>Radio de una parada larga alrededor de su centro, en metros (el ruido de la red en casa va de 150 a 300 m; con mas, una ida y vuelta andando de 600 m se tomaria por parada).</summary>
+    internal const double StopRadius = 150;
+
+    /// <summary>Tiempo minimo para que un grupo de lecturas cuente como parada.</summary>
+    internal static readonly TimeSpan StopMinDuration = TimeSpan.FromMinutes(10);
+
+    /// <summary>Lecturas seguidas fuera del radio que se toleran como ruido dentro de una parada.</summary>
+    internal const int StopMaxMisses = 5;
+
+    public static IReadOnlyList<TrackPoint> Clean(IReadOnlyList<TrackPoint> points) => CleanWithStops(points).Points;
+
+    /// <summary>
+    /// Limpia y devuelve ademas las paradas (para pintarlas como un punto, no como lineas).
+    /// </summary>
+    public static CleanTrack CleanWithStops(IReadOnlyList<TrackPoint> points)
     {
         if (points.Count < 3)
-            return points;
+            return new CleanTrack(points, []);
 
-        return MergeStops(DropLoneEnds(DropJumps(points)));
+        var (merged, stops) = FindStops(DropLoneEnds(DropJumps(points)));
+        return new CleanTrack(MergeStops(merged), stops);
+    }
+
+    /// <summary>
+    /// Paradas largas: lecturas que se quedan a menos de <see cref="StopRadius"/> de su centro
+    /// durante <see cref="StopMinDuration"/> o mas (tolerando hasta <see cref="StopMaxMisses"/>
+    /// seguidas fuera, que son ruido). Cada una queda como un solo punto.
+    /// </summary>
+    internal static (List<TrackPoint> Points, List<TrackStop> Stops) FindStops(IReadOnlyList<TrackPoint> points)
+    {
+        var result = new List<TrackPoint>();
+        var stops = new List<TrackStop>();
+        var i = 0;
+        while (i < points.Count)
+        {
+            var start = points[i];
+            if (start.At == default)
+            {
+                result.Add(start);
+                i++;
+                continue;
+            }
+
+            double sw = 0, lat = 0, lon = 0, best = double.MaxValue;
+            void Add(TrackPoint p)
+            {
+                var w = 1 / Math.Pow(Math.Max(Acc(p), 1), 2);
+                sw += w;
+                lat += p.Lat * w;
+                lon += p.Lon * w;
+                best = Math.Min(best, Acc(p));
+            }
+
+            Add(start);
+            var lastIn = i;
+            var inside = 1;
+            var misses = 0;
+            for (var j = i + 1; j < points.Count; j++)
+            {
+                var center = new TrackPoint(lat / sw, lon / sw, best);
+                if (Distance(center, points[j]) <= StopRadius)
+                {
+                    Add(points[j]);
+                    lastIn = j;
+                    inside++;
+                    misses = 0;
+                }
+                else if (++misses > StopMaxMisses)
+                {
+                    break;
+                }
+            }
+
+            if (inside >= 2 && points[lastIn].At != default && points[lastIn].At - start.At >= StopMinDuration)
+            {
+                var stop = new TrackStop(new GeoPoint(lat / sw, lon / sw), start.At, points[lastIn].At, inside);
+                stops.Add(stop);
+                result.Add(new TrackPoint(stop.Center.Lat, stop.Center.Lon, best, start.At));
+                i = lastIn + 1;
+            }
+            else
+            {
+                result.Add(start);
+                i++;
+            }
+        }
+
+        return (result, stops);
     }
 
     /// <summary>
@@ -156,3 +238,9 @@ public static class TrackCleaner
         return Distance(a, b) / Math.Max(seconds, 1) * 3.6;
     }
 }
+
+/// <summary>Una parada larga: donde, desde cuando, hasta cuando y cuantas lecturas junta.</summary>
+public sealed record TrackStop(GeoPoint Center, DateTimeOffset From, DateTimeOffset To, int Count);
+
+/// <summary>Recorrido limpio y sus paradas.</summary>
+public sealed record CleanTrack(IReadOnlyList<TrackPoint> Points, IReadOnlyList<TrackStop> Stops);

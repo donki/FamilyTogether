@@ -23,11 +23,13 @@ public sealed class HistoryPage : ContentPage
     private const int RetentionDays = 30;
     private const string StartColor = "#27AE60";
     private const string EndColor = "#BA1A1A";
+    private const string StopColor = "#3525CD";
 
     private readonly FamilyService _family = ServiceHelper.Get<FamilyService>();
     private readonly TrackSnapper _snapper = ServiceHelper.Get<TrackSnapper>();
     private readonly Label _snapStatus = new();
     private CancellationTokenSource? _snapCancel;
+    private List<object[]> _stops = [];
     private static readonly TimeSpan SnapLimit = TimeSpan.FromSeconds(75);
     private readonly GroupSelector _selector = new();
     private readonly Picker _member = new();
@@ -72,6 +74,7 @@ public sealed class HistoryPage : ContentPage
             {
                 Dot(StartColor, Loc.Get("TrackStart")),
                 Dot(EndColor, Loc.Get("TrackEnd")),
+                Dot(StopColor, Loc.Get("TrackStop")),
             },
         };
 
@@ -209,10 +212,18 @@ public sealed class HistoryPage : ContentPage
             _summary.Text = Loc.Format("TrackSummary", ordered.Count, first, last);
 
             // Sin saltos de ida y vuelta imposibles ni marañas de las paradas (solo el dibujo).
-            var clean = TrackCleaner.Clean([.. ordered.Select(p => new TrackPoint(p.Lat, p.Lon, p.Accuracy, p.At))]);
-            CrashLog.Info($"historial: {ordered.Count} posiciones, {clean.Count} tras limpiar");
+            // Las paradas largas (10 min o mas en ~150 m) se pintan como un punto, no como lineas.
+            var cleaned = TrackCleaner.CleanWithStops([.. ordered.Select(p => new TrackPoint(p.Lat, p.Lon, p.Accuracy, p.At))]);
+            var clean = cleaned.Points;
+            _stops = [.. cleaned.Stops.Select(s => new object[]
+            {
+                s.Center.Lat, s.Center.Lon,
+                Loc.Format("StopLabel", s.From.ToLocalTime().ToString("HH:mm", Loc.Culture), s.To.ToLocalTime().ToString("HH:mm", Loc.Culture)),
+            })];
+            CrashLog.Info($"historial: {ordered.Count} posiciones, {clean.Count} tras limpiar, {cleaned.Stops.Count} paradas");
             var coords = clean.Select(p => new[] { p.Lat, p.Lon }).ToList();
             await _map.RunAsync($"setTrack({MapView.Json(coords)}, '{StartColor}', '{EndColor}')");
+            await _map.RunAsync($"addStops({MapView.Json(_stops)})");
 
             if (AppState.SnapTracks && clean.Count >= 2)
             {
@@ -251,6 +262,7 @@ public sealed class HistoryPage : ContentPage
             {
                 var coords = result.Track.Line.Select(p => new[] { p.Lat, p.Lon }).ToList();
                 await _map.RunAsync($"setTrack({MapView.Json(coords)}, '{StartColor}', '{EndColor}')");
+                await _map.RunAsync($"addStops({MapView.Json(_stops)})");
             }
 
             _snapStatus.Text = result switch
