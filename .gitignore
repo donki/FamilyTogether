@@ -22,3 +22,7 @@ supabase/.temp/
 supabase/.branches/
 supabase/functions/.env
 releases/
+
+# Cuentas de servicio de Firebase (claves privadas: solo en D:\dev\secrets)
+*firebase-adminsdk*.json
+*service-account*.json

@@ -32,6 +32,43 @@ public class IntegrationTests
     private static bool Enabled => Environment.GetEnvironmentVariable("FT_INTEGRATION") == "1"
                                    && FamilyTogetherConfig.IsServerConfigured;
 
+    /// <summary>
+    /// La Edge Function <c>notify</c> entra en FCM con la cuenta de servicio: con un token inventado,
+    /// Google tiene que responder que el token no vale (y eso solo pasa si antes aceptó las credenciales).
+    /// </summary>
+    [Fact]
+    public async Task Sos_llega_a_FCM_con_la_cuenta_de_servicio()
+    {
+        if (!Enabled)
+            return;
+
+        var a = NewUser();
+        var b = NewUser();
+        await a.Client.EnsureSignedInAsync();
+        await b.Client.EnsureSignedInAsync();
+        var group = await a.CreateGroupAsync("FCM " + DateTime.UtcNow.ToString("HHmmss"), "Ana", null);
+        var request = await b.RequestJoinAsync((await a.CreateInvitationAsync(group.Id)).Code, "Blas");
+        await a.ApproveAsync(Assert.Single(await a.GetPendingRequestsAsync(group.Id)));
+        Assert.Equal(JoinState.Approved, await b.CheckMyRequestAsync(request));
+        await b.RegisterPushTokenAsync("token-inventado-para-la-prueba-" + Guid.NewGuid().ToString("N"));
+
+        var sos = Guid.NewGuid();
+        await a.Client.RpcAsync("create_sos", new
+        {
+            p_id = sos,
+            p_targets = new[] { new { group_id = group.Id, payload_enc = "enc1:prueba" } },
+        });
+        using var response = await a.Client.InvokeFunctionAsync("notify", new { type = "sos", id = sos });
+        var body = await response.Content.ReadAsStringAsync();
+        Console.WriteLine($"notify: {(int)response.StatusCode} {body}");
+        Assert.True(response.IsSuccessStatusCode, body);
+        Assert.DoesNotContain("fcm_not_configured", body);
+        Assert.DoesNotContain("auth", body, StringComparison.OrdinalIgnoreCase);
+
+        await b.LeaveGroupAsync(group.Id);
+        await a.LeaveGroupAsync(group.Id);
+    }
+
     [Fact]
     public async Task Ciclo_completo_contra_el_servidor()
     {
