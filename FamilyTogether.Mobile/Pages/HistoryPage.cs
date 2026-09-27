@@ -28,6 +28,7 @@ public sealed class HistoryPage : ContentPage
     private readonly TrackSnapper _snapper = ServiceHelper.Get<TrackSnapper>();
     private readonly Label _snapStatus = new();
     private CancellationTokenSource? _snapCancel;
+    private static readonly TimeSpan SnapLimit = TimeSpan.FromSeconds(75);
     private readonly GroupSelector _selector = new();
     private readonly Picker _member = new();
     private readonly DatePicker _day = new() { Format = "D" };
@@ -207,13 +208,16 @@ public sealed class HistoryPage : ContentPage
             var last = ordered[^1].At.ToLocalTime().ToString("HH:mm", Loc.Culture);
             _summary.Text = Loc.Format("TrackSummary", ordered.Count, first, last);
 
-            var coords = ordered.Select(p => new[] { p.Lat, p.Lon }).ToList();
+            // Sin saltos de ida y vuelta imposibles ni marañas de las paradas (solo el dibujo).
+            var clean = TrackCleaner.Clean([.. ordered.Select(p => new TrackPoint(p.Lat, p.Lon, p.Accuracy, p.At))]);
+            CrashLog.Info($"historial: {ordered.Count} posiciones, {clean.Count} tras limpiar");
+            var coords = clean.Select(p => new[] { p.Lat, p.Lon }).ToList();
             await _map.RunAsync($"setTrack({MapView.Json(coords)}, '{StartColor}', '{EndColor}')");
 
-            if (AppState.SnapTracks && ordered.Count >= 2)
+            if (AppState.SnapTracks && clean.Count >= 2)
             {
                 _snapCancel = new CancellationTokenSource();
-                _ = SnapAsync([.. ordered.Select(p => new TrackPoint(p.Lat, p.Lon, p.Accuracy))], _snapCancel.Token);
+                _ = SnapAsync(clean, _snapCancel.Token);
             }
         }
         finally
@@ -228,14 +232,20 @@ public sealed class HistoryPage : ContentPage
     /// </summary>
     private async Task SnapAsync(IReadOnlyList<TrackPoint> points, CancellationToken cancellationToken)
     {
+        // Tope total: pase lo que pase con la red, en este tiempo se acaba (recto si hace falta).
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(SnapLimit);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             _snapStatus.Text = Loc.Get("SnapWorking");
             _snapStatus.IsVisible = true;
 
-            var result = await _snapper.SnapAsync(points, cancellationToken);
+            var result = await _snapper.SnapAsync(points, limit.Token);
             if (cancellationToken.IsCancellationRequested)
                 return;
+            CrashLog.Info($"historial: ajuste {result.Track.MatchedPoints}/{result.Track.PointCount} posiciones, " +
+                          $"faltan {result.TilesMissing} de {result.TilesWanted} teselas, {watch.Elapsed.TotalSeconds:F1} s");
 
             if (result.Track.MatchedPoints > 0)
             {
@@ -251,6 +261,12 @@ public sealed class HistoryPage : ContentPage
                 _ => string.Empty,
             };
             _snapStatus.IsVisible = _snapStatus.Text.Length > 0;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Tope total agotado: se queda recto y se dice.
+            CrashLog.Info($"historial: ajuste sin terminar en {watch.Elapsed.TotalSeconds:F0} s; queda recto");
+            _snapStatus.Text = Loc.Get("SnapUnavailable");
         }
         catch (OperationCanceledException)
         {

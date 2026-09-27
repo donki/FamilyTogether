@@ -51,22 +51,22 @@ public class OsmRoadSourceTests : IDisposable
         var handler = new FakeHandler((request, _) => request.RequestUri!.Host == "uno"
             ? new HttpResponseMessage(HttpStatusCode.TooManyRequests)
             : Json(OneWay));
-        var source = new OsmRoadSource(new HttpClient(handler), _dir, ["https://uno/api", "https://dos/api"]);
+        var source = new OsmRoadSource(new HttpClient(handler), _dir, ["https://uno/api", "https://dos/api"]) { MaxRetryWait = TimeSpan.FromMilliseconds(10) };
 
         var first = await source.GetAsync(Track);
         Assert.Single(first.Ways);
         Assert.Equal(0, first.TilesMissing);
-        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(4, handler.Requests.Count);   // tres 429 (dos reintentos tras esperar) y el segundo
 
         // Lo pedido es el rectangulo de la tesela fija, sin nada del recorrido.
-        var body = Uri.UnescapeDataString(handler.Requests[1].Body.Replace('+', ' '));
+        var body = Uri.UnescapeDataString(handler.Requests[3].Body.Replace('+', ' '));
         Assert.Contains("(40.00,-3.02,40.02,-3.00)", body);
         Assert.DoesNotContain("40.0015", body);
 
         // Otra instancia (la app reiniciada) la lee del disco sin preguntar.
         var again = new OsmRoadSource(new HttpClient(handler), _dir, ["https://uno/api", "https://dos/api"]);
         Assert.Single((await again.GetAsync(Track)).Ways);
-        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(4, handler.Requests.Count);
     }
 
     [Fact]
@@ -80,10 +80,10 @@ public class OsmRoadSourceTests : IDisposable
 
         now += OsmRoadSource.CacheLifetime + TimeSpan.FromDays(1);
         fail = true;
-        var later = new OsmRoadSource(new HttpClient(handler), _dir, ["https://uno/api"], () => now);
+        var later = new OsmRoadSource(new HttpClient(handler), _dir, ["https://uno/api"], () => now) { MaxRetryWait = TimeSpan.FromMilliseconds(10) };
         var result = await later.GetAsync(Track);
 
-        Assert.Equal(2, handler.Requests.Count);   // intento renovarla
+        Assert.Equal(4, handler.Requests.Count);   // intento renovarla (504 y dos reintentos)
         Assert.Single(result.Ways);                 // y uso la vieja
         Assert.Equal(0, result.TilesMissing);
     }
@@ -154,5 +154,41 @@ public class OsmRoadSourceTests : IDisposable
         Assert.Equal(5, way.Id);
         Assert.Equal(ways[0].Nodes, way.Nodes);
         Assert.Equal(ways[0].Points, way.Points);
+    }
+}
+
+public class OsmRoadSourceTimeoutTests
+{
+    /// <summary>Un servidor que no contesta nunca (lo que pasaba con overpass.kumi.systems).</summary>
+    private sealed class Silent : HttpMessageHandler
+    {
+        public int Calls;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Calls);
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException();
+        }
+    }
+
+    [Fact]
+    public async Task Un_servidor_mudo_no_deja_colgado_el_ajuste()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"ft-roads-{Guid.NewGuid():N}");
+        var handler = new Silent();
+        var source = new OsmRoadSource(new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan }, dir, ["https://mudo/api"])
+        {
+            RequestTimeout = TimeSpan.FromMilliseconds(300),
+        };
+        var track = Enumerable.Range(0, 6).Select(i => new TrackPoint(41.43, 2.201 + i * RoadTile.Size, 10)).ToList();
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var result = await new TrackSnapper(source).SnapAsync(track);
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"tardo {watch.Elapsed}");
+        Assert.Equal(result.TilesWanted, result.TilesMissing);
+        Assert.Equal(1, handler.Calls);   // tras el primer silencio, ese servidor descansa
+        Assert.Equal(track.Count, result.Track.Line.Count);
     }
 }

@@ -96,6 +96,23 @@ public static class CrashLog
     private static void Write(string level, string message)
     {
         System.Diagnostics.Debug.WriteLine($"[Family Together] {level} {message}");
+#if ANDROID
+        // Tambien al logcat (etiqueta FamilyTogether); lo de NativeLog ya fue.
+        if (!message.StartsWith("android", StringComparison.Ordinal))
+        {
+            try
+            {
+                if (level == "ERROR")
+                    global::Android.Util.Log.Error("FamilyTogether", message);
+                else
+                    global::Android.Util.Log.Info("FamilyTogether", message);
+            }
+            catch
+            {
+                // Sin logcat, queda el fichero.
+            }
+        }
+#endif
         try
         {
             lock (Gate)

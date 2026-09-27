@@ -41,9 +41,15 @@ public sealed record RoadFetch(IReadOnlyList<OsmWay> Ways, int TilesWanted, int 
 /// usuario; el recorrido ajustado no se guarda en ningun sitio.</para>
 ///
 /// <para><b>Uso razonable de Overpass</b> (como Hiker): como mucho <see cref="MaxTilesPerTrack"/>
-/// teselas por recorrido (las que mas posiciones tienen), dos peticiones a la vez, y si un servidor
-/// responde 429 o falla se prueba el siguiente. Si fallan todos, no se vuelve a preguntar en
-/// <see cref="Cooldown"/>.</para>
+/// teselas por recorrido (las que mas posiciones tienen), una peticion cada vez, y la consulta
+/// declara poco tiempo y memoria (asi Overpass la admite antes). Un 429 o un 504 se reintentan tras
+/// esperar (Retry-After, como mucho 10 s); si un servidor no contesta o falla la conexion, se prueba
+/// el siguiente y ese no se vuelve a usar en <see cref="Cooldown"/>.</para>
+///
+/// <para><b>Tiempos (2026-09-27, visto en el Xiaomi).</b> overpass.kumi.systems no contestaba desde
+/// la red de casa y cada tesela esperaba 70 s por el: el historial se quedaba «ajustando» minutos.
+/// Ahora cada peticion tiene <see cref="RequestTimeout"/> y todo el reparto
+/// <see cref="FetchBudget"/>; lo que no llega a tiempo cuenta como que falta y va recto.</para>
 /// </remarks>
 public sealed class OsmRoadSource
 {
@@ -52,11 +58,21 @@ public sealed class OsmRoadSource
     public static readonly TimeSpan CacheLifetime = TimeSpan.FromDays(30);
     public static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(2);
 
+    /// <summary>Intentos por servidor y tesela (los 429 y 504 se reintentan tras esperar).</summary>
+    private const int MaxAttempts = 3;
+
     /// <summary>Margen alrededor de cada posicion al decidir que teselas toca (unos 100 m).</summary>
     private const double PointMarginDegrees = 0.001;
 
     private const int MemoryTiles = 40;
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(70);
+    /// <summary>Tiempo maximo de cada peticion a Overpass.</summary>
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(25);
+
+    /// <summary>Espera maxima antes de reintentar un 429 o un 504.</summary>
+    public TimeSpan MaxRetryWait { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>Tiempo maximo de descargas para un recorrido; despues, solo la cache.</summary>
+    public TimeSpan FetchBudget { get; init; } = TimeSpan.FromSeconds(40);
 
     /// <summary>Los mismos servidores publicos que Hiker.</summary>
     public static readonly IReadOnlyList<string> DefaultEndpoints =
@@ -80,7 +96,7 @@ public sealed class OsmRoadSource
     private readonly Dictionary<RoadTile, List<OsmWay>> _memory = [];
     private readonly LinkedList<RoadTile> _memoryOrder = new();
     private readonly object _memoryLock = new();
-    private DateTimeOffset _quietUntil = DateTimeOffset.MinValue;
+    private readonly Dictionary<string, DateTimeOffset> _quietUntil = [];
 
     public OsmRoadSource(HttpClient http, string cacheDirectory, IReadOnlyList<string>? endpoints = null, Func<DateTimeOffset>? now = null)
     {
@@ -121,20 +137,14 @@ public sealed class OsmRoadSource
         var wanted = tiles.Take(MaxTilesPerTrack).ToList();
         var missing = tiles.Count - wanted.Count;
         var ways = new List<OsmWay>();
-        var gate = new SemaphoreSlim(2, 2);
-
-        var results = await Task.WhenAll(wanted.Select(async tile =>
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var results = new List<List<OsmWay>?>();
+        foreach (var tile in wanted)
         {
-            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                return await TileAsync(tile, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                gate.Release();
-            }
-        })).ConfigureAwait(false);
+            // Pasado el tiempo total, solo lo que ya esta en el movil.
+            var download = watch.Elapsed < FetchBudget;
+            results.Add(await TileAsync(tile, download, cancellationToken).ConfigureAwait(false));
+        }
 
         foreach (var result in results)
         {
@@ -145,12 +155,12 @@ public sealed class OsmRoadSource
         }
 
         if (missing > 0)
-            CoreLog.Write($"Red de calles: faltan {missing} de {tiles.Count} teselas");
+            CoreLog.Write($"Red de calles: faltan {missing} de {tiles.Count} teselas ({watch.Elapsed.TotalSeconds:F1} s)");
 
         return new RoadFetch(ways, tiles.Count, missing);
     }
 
-    private async Task<List<OsmWay>?> TileAsync(RoadTile tile, CancellationToken cancellationToken)
+    private async Task<List<OsmWay>?> TileAsync(RoadTile tile, bool download, CancellationToken cancellationToken)
     {
         lock (_memoryLock)
         {
@@ -175,7 +185,7 @@ public sealed class OsmRoadSource
             CoreLog.Write($"Cache de calles {tile} ilegible: {ex.Message}");
         }
 
-        var fresh = await DownloadAsync(tile, cancellationToken).ConfigureAwait(false);
+        var fresh = download ? await DownloadAsync(tile, cancellationToken).ConfigureAwait(false) : null;
         if (fresh is null)
             return stale is null ? null : Remember(tile, stale);
 
@@ -235,50 +245,73 @@ public sealed class OsmRoadSource
     // -----------------------------------------------------------------------
 
     internal static string Query(RoadTile tile) => string.Create(CultureInfo.InvariantCulture,
-        $"[out:json][timeout:60];way[\"highway\"~\"{HighwayFilter}\"]({tile.South:F2},{tile.West:F2},{tile.North:F2},{tile.East:F2});out skel geom qt;");
+        $"[out:json][timeout:20][maxsize:33554432];way[\"highway\"~\"{HighwayFilter}\"]({tile.South:F2},{tile.West:F2},{tile.North:F2},{tile.East:F2});out skel geom qt;");
 
     private async Task<List<OsmWay>?> DownloadAsync(RoadTile tile, CancellationToken cancellationToken)
     {
-        if (_now() < _quietUntil)
-            return null;
-
         foreach (var endpoint in _endpoints)
         {
-            try
-            {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(RequestTimeout);
-                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
-                {
-                    Content = new FormUrlEncodedContent([new KeyValuePair<string, string>("data", Query(tile))]),
-                };
-                request.Headers.TryAddWithoutValidation("User-Agent", "FamilyTogether/2026 (Android; Socratic)");
+            if (_quietUntil.TryGetValue(endpoint, out var until) && _now() < until)
+                continue;
 
-                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
-                    .ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode)
+            var dead = false;
+            for (var attempt = 0; attempt < MaxAttempts; attempt++)
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                try
                 {
-                    // 429 (saturado) o 504: se prueba el siguiente servidor.
-                    CoreLog.Write($"Overpass {endpoint}: {(int)response.StatusCode}");
-                    continue;
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeout.CancelAfter(RequestTimeout);
+                    using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                    {
+                        Content = new FormUrlEncodedContent([new KeyValuePair<string, string>("data", Query(tile))]),
+                    };
+                    request.Headers.TryAddWithoutValidation("User-Agent", "FamilyTogether/2026 (Android; Socratic)");
+
+                    using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
+                        .ConfigureAwait(false);
+                    var status = (int)response.StatusCode;
+                    if ((status == 429 || status == 504) && attempt < MaxAttempts - 1)
+                    {
+                        // 429: esta IP ya tiene sus huecos ocupados; 504: el servidor va cargado.
+                        // Las dos se pasan esperando un poco (Retry-After, como mucho 10 s).
+                        var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(status == 429 ? 5 : 3);
+                        wait = wait > MaxRetryWait ? MaxRetryWait : wait;
+                        CoreLog.Write($"Overpass {endpoint} tesela {tile}: {status} en {watch.Elapsed.TotalSeconds:F1} s, reintento en {wait.TotalSeconds:F0} s");
+                        await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        CoreLog.Write($"Overpass {endpoint} tesela {tile}: {status} en {watch.Elapsed.TotalSeconds:F1} s");
+                        break;
+                    }
+
+                    var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token).ConfigureAwait(false);
+                    using var document = JsonDocument.Parse(bytes);
+                    if (ParseOverpass(document) is { } ways)
+                    {
+                        CoreLog.Write($"Overpass {endpoint} tesela {tile}: {ways.Count} vias, {bytes.Length / 1024} KB en {watch.Elapsed.TotalSeconds:F1} s");
+                        return ways;
+                    }
+
+                    CoreLog.Write($"Overpass {endpoint} tesela {tile}: respuesta con error de ejecucion");
+                    break;
                 }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Sin respuesta a tiempo, sin red, o lo que sea: en Android el tiempo agotado llega
+                    // como WebException «Socket closed», no como cancelacion. Este servidor descansa.
+                    CoreLog.Write($"Overpass {endpoint} tesela {tile}: {ex.GetType().Name} {ex.Message} en {watch.Elapsed.TotalSeconds:F0} s");
+                    dead = true;
+                    break;
+                }
+            }
 
-                await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
-                using var document = await JsonDocument.ParseAsync(stream, cancellationToken: timeout.Token).ConfigureAwait(false);
-                if (ParseOverpass(document) is { } ways)
-                    return ways;
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                CoreLog.Write($"Overpass {endpoint}: tiempo agotado");
-            }
-            catch (Exception ex) when (ex is HttpRequestException or JsonException or IOException)
-            {
-                CoreLog.Write($"Overpass {endpoint}: {ex.Message}");
-            }
+            if (dead)
+                _quietUntil[endpoint] = _now() + Cooldown;
         }
 
-        _quietUntil = _now() + Cooldown;
         return null;
     }
 

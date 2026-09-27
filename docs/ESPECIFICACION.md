@@ -117,6 +117,9 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   con la red de OpenStreetMap pedida a Overpass **por teselas fijas de 0,02°**, nunca el recorrido;
   caché de 30 días. Lo que no encaja va recto; nunca un rodeo inventado. Interruptor en Ajustes,
   encendido por defecto. Solo cambia el dibujo: no se guarda ni se reescribe nada.
+- **Traza limpia al dibujar (2026-09-27)**: se quitan los saltos de ida y vuelta imposibles (más de
+  50 km/h en un salto que vuelve) y las paradas se juntan en un punto; el ajuste a calles tiene
+  tiempo máximo y, si no llega, se queda recto con aviso.
 - **Todo texto que se guarde en el servidor va cifrado** con la clave del grupo (regla de Josep).
 - Detalle técnico en [ARQUITECTURA.md](ARQUITECTURA.md).
 

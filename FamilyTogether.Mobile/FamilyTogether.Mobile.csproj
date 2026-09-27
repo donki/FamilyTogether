@@ -16,8 +16,8 @@
     <ApplicationId>com.socratic.familytogether</ApplicationId>
 
     <!-- Version (constitucion Mobile 3: los dos valores en sincronia, esquema de fecha) -->
-    <ApplicationDisplayVersion>2026.09.27.03</ApplicationDisplayVersion>
-    <ApplicationVersion>2026092703</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.09.27.04</ApplicationDisplayVersion>
+    <ApplicationVersion>2026092704</ApplicationVersion>
 
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
 

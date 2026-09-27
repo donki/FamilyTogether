@@ -337,6 +337,22 @@ Los textos visibles de los avisos los monta la app con su localización a partir
   por defecto) se ajusta en segundo plano y se redibuja, con una línea de estado (ajustado, en parte,
   o sin mapa). Sin mapa, recto como antes y sin diálogos. **El recorrido ajustado no se guarda** ni
   en el servidor ni en el móvil.
+- **Tiempos (2026-09-27.04)**: `overpass.kumi.systems` no contesta desde algunas redes (la de
+  casa), y con 70 s por petición el historial se quedaba minutos «ajustando». Ahora: peticiones de
+  una en una, 25 s cada una, 40 s de descargas por recorrido (después solo caché), 75 s de tope en la
+  pantalla; la consulta declara `[timeout:20][maxsize:32 MiB]` para que Overpass la admita antes;
+  429 y 504 (overpass-api.de da 504 cuando va cargado) se reintentan hasta 2 veces tras esperar
+  (Retry-After, máx. 10 s); un servidor que no contesta o corta la conexión descansa 2 min (en
+  Android el tiempo agotado llega como `WebException: Socket closed`, no como cancelación: se captura
+  todo lo que no sea cancelar desde fuera). Todo queda en logcat (`FamilyTogether`, «core: Overpass
+  …»).
+- **Limpieza antes de dibujar** (`TrackCleaner`, también con el ajuste apagado): excursión = salto
+  de más de 300 m que en ≤ 5 lecturas vuelve de otro salto igual cerca del punto de partida → se
+  quita entera, **sin mirar la velocidad** (en el Xiaomi las puntas llegaban con minutos entre
+  medias, desde casa; y como se envía una posición cada 25 m, un viaje real de ida y vuelta deja
+  muchas lecturas por el camino); cualquier salto a más de 200 km/h (mayor que las dos
+  precisiones) → fuera; punta suelta al principio o al final → fuera; lecturas seguidas a menos de
+  su precisión (mín. 15 m) de la primera → un punto (media ponderada por 1/precisión²).
 - Referencia de rendimiento (PC): una tesela del centro de Madrid (1,7 MB de Overpass, 590 KB en
   caché, 11 500 nodos) se lee y monta en ~40 ms y 283 posiciones se ajustan en ~0,3 s con 0,9 m de
   error medio; la primera vez manda la descarga (~6 s por tesela urbana).

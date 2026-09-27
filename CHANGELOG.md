@@ -1,5 +1,19 @@
 # Changelog — Family Together
 
+## 2026.09.27.04
+
+- **Historial colgado en «Ajustando…»** (visto en el Xiaomi): `overpass.kumi.systems` no contesta
+  desde la red de casa y cada tesela esperaba 70 s por él. Ahora 25 s por petición, 40 s de
+  descargas por recorrido y 75 s de tope total en la pantalla; un servidor que falla descansa 2 min;
+  un 429 se reintenta una vez; peticiones de una en una. Lo que no llega va recto con su aviso.
+- Registro en logcat (etiqueta `FamilyTogether`) de lo que cuenta el núcleo: cada tesela pedida,
+  servidor, tamaño, tiempo o fallo, y el resultado del ajuste.
+- Overpass: 429 y 504 se reintentan tras esperar; consulta más ligera (`[timeout:20][maxsize]`); el
+  tiempo agotado en Android (`WebException: Socket closed`) ya no se escapa.
+- **Limpieza de la traza** antes de dibujar y ajustar (`TrackCleaner`): fuera las excursiones de ida
+  y vuelta de más de 300 m con pocas lecturas (saltos de 1 km que vuelven, aunque sea minutos después), los saltos a más de 200 km/h y las puntas
+  al principio o al final; las paradas (lecturas dentro de su precisión) se juntan en un punto.
+
 ## 2026.09.27.03
 
 - **Historial por las calles**: el recorrido de un día se ajusta en el móvil a la red de calles y

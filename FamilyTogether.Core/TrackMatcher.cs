@@ -1,7 +1,7 @@
 namespace FamilyTogether.Core;
 
-/// <summary>Una posicion del recorrido con su precision (metros).</summary>
-public readonly record struct TrackPoint(double Lat, double Lon, double Accuracy);
+/// <summary>Una posicion del recorrido con su precision (metros) y su hora (default si no se sabe).</summary>
+public readonly record struct TrackPoint(double Lat, double Lon, double Accuracy, DateTimeOffset At = default);
 
 /// <summary>
 /// Resultado del ajuste: la linea que se dibuja y cuantas posiciones se pegaron a la red.

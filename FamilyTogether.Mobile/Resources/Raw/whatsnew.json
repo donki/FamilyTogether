@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.09.27.04",
+    "date": "2026-09-27",
+    "es": [
+      "El historial ya no se queda «ajustando» sin fin: cada consulta del mapa de calles tiene un tiempo máximo y, si no llega, el recorrido se queda en línea recta con su aviso.",
+      "Recorridos más limpios: se quitan los saltos de ida y vuelta imposibles (lecturas de la ubicación a cientos de metros que enseguida vuelven) y las paradas se ven como un solo punto."
+    ],
+    "en": [
+      "History no longer stays \"snapping\" forever: every street map lookup has a time limit and, if it does not arrive, the route stays as straight lines with a notice.",
+      "Cleaner routes: impossible out-and-back jumps (location readings hundreds of metres away that come straight back) are removed, and stops show as a single point."
+    ]
+  },
+  {
     "version": "2026.09.27.03",
     "date": "2026-09-27",
     "es": [
