@@ -1,5 +1,9 @@
 # Changelog — Family Together
 
+## 2026.09.29.01
+
+- **Fechas en formato corto** (27/09/2026, o el corto del idioma del móvil) en el día de Historial y en Novedades; antes salía «domingo, 27 de septiembre de 2026».
+
 ## 2026.09.29.00
 
 - **Mapa a pantalla completa**: fuera la lista de personas de debajo del mapa. La lupa (**Buscar a

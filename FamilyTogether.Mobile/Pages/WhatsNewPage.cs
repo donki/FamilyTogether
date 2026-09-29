@@ -38,7 +38,7 @@ public sealed class WhatsNewPage : ContentPage
             var current = release.Version == AppInfo.Current.VersionString;
             stack.Add(UiKit.Title(current ? Loc.Format("WhatsNewCurrent", release.Version) : release.Version));
             if (release.Date.Length > 0 && DateTime.TryParse(release.Date, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
-                stack.Add(UiKit.Hint(date.ToString("D", Loc.Culture)));
+                stack.Add(UiKit.Hint(date.ToString("d", Loc.Culture)));
 
             foreach (var item in release.Items)
             {

@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.09.29.01",
+    "date": "2026-09-29",
+    "es": [
+      "Las fechas salen en formato corto (27/09/2026) en Historial y en Novedades."
+    ],
+    "en": [
+      "Dates are shown in short format in History and What's new."
+    ]
+  },
+  {
     "version": "2026.09.29.00",
     "date": "2026-09-29",
     "es": [

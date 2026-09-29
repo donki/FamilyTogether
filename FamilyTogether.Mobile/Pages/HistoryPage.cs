@@ -33,7 +33,7 @@ public sealed class HistoryPage : ContentPage
     private static readonly TimeSpan SnapLimit = TimeSpan.FromSeconds(75);
     private readonly GroupSelector _selector = new();
     private readonly Picker _member = new();
-    private readonly DatePicker _day = new() { Format = "D" };
+    private readonly DatePicker _day = new() { Format = "d" };   // fecha corta (27/09/2026)
     private readonly MapView _map = new();
     private readonly Label _summary = new();
     private IReadOnlyList<Member> _members = [];
