@@ -8,7 +8,9 @@ recuperarlo en otro móvil. En castellano e inglés.
 
 ## Dónde conseguirla
 
-Todavía en desarrollo: no está en Google Play ni tiene releases.
+Todavía no está en Google Play. El APK de cada versión está en las
+[releases de GitHub](https://github.com/donki/FamilyTogether/releases): se instala a mano en el móvil
+(Android 8 o posterior) permitiendo instalar aplicaciones de origen desconocido.
 
 ## Cómo está hecha
 
