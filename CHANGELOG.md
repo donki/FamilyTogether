@@ -1,5 +1,38 @@
 # Changelog — Family Together
 
+## 2026.09.29.00
+
+- **Mapa a pantalla completa**: fuera la lista de personas de debajo del mapa. La lupa (**Buscar a
+  una persona**, abajo a la derecha, encima del SOS) abre la lista del grupo en una hoja (avatar,
+  hora y batería o «En pausa», y **Ver a todos**); elegir a alguien la cierra y centra el mapa en esa
+  persona. Atrás o tocar fuera la cierra primero (Mobile §7).
+- **Una sola marca para mí**: fuera el punto azul con su círculo de precisión (daba dos marcas para
+  la misma persona, a unos 150 m en el Xiaomi). Mi marca (foto o inicial con mi nombre) se pinta en
+  la lectura de este móvil, que es más reciente que la del servidor; sin permiso ni lectura propia,
+  en la del servidor. Lo que se envía al grupo no cambia.
+- **El aviso «X quiere unirse» se quita al resolver la solicitud**: en el móvil que aprueba o
+  rechaza y, por FCM, en los de los demás administradores (`notify` manda `request_resolved`
+  también a ellos, que solo quitan el aviso).
+- **Lector de pantalla**: los controles de MapLibre en el idioma de la app (`locale`: «Acercar»,
+  «Alejar», «Mostrar u ocultar los créditos del mapa», «Mapa»…) y cada marcador con su etiqueta
+  (la persona, «Zona …», «Centro de la zona», «Inicio», «Fin», «Parada») en vez de «Map marker»;
+  los interruptores de Avisos de zonas dicen persona, zona y llegada o salida.
+- **Inicio automático**: texto propio solo para Xiaomi, Redmi y POCO; el resto de fabricantes y los
+  desconocidos, texto genérico (constitución General §6.13), y el paso sale siempre. Un Android
+  sobre x86 (emulador: MuMu se declara Samsung) cuenta como desconocido. El botón sigue abriendo la
+  pantalla del fabricante si se conoce.
+- Textos sin nombres de productos ajenos que no sean de licencia (fuera «Overpass»).
+- **Servidor: al expulsado no le vale un código de antes de la expulsión** (visto en la prueba de
+  dos móviles: un código creado después de que entrara y antes de expulsarlo le servía).
+  `07_expulsion.sql`: `group_removals` (sin texto), `remove_member` la rellena y un disparador en
+  `join_requests` responde `expired`. Aplicada en el servidor y en `prueba_local.sql`.
+- Sin grupos, el mapa no enseña la lupa ni el SOS (tapaban **Ir a Grupos**); «Ver a todos» deja
+  margen para que ninguna marca quede debajo de la lupa o del SOS.
+- Prueba en dos MuMu (sin el Xiaomi): cola sin conexión (las posiciones llegan con su hora),
+  expulsar, último administrador (no sale sin nombrar a otro; el único miembro que sale borra el
+  grupo), atrás en todas las pantallas y letra al 145 %. El QR no se puede probar en MuMu (la
+  cámara sale en gris).
+
 ## 2026.09.28.00
 
 - **Causa del historial ruidoso, atacada en origen** (el Xiaomi estuvo quieto en casa toda la tarde

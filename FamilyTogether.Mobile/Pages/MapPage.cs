@@ -7,11 +7,13 @@ using FamilyTogether.Mobile.Services;
 namespace FamilyTogether.Mobile.Pages;
 
 /// <summary>
-/// Inicio: el mapa del grupo elegido con un marcador por miembro y, abajo, la lista con la hora de
-/// su ultima posicion, la bateria o «En pausa» (FR-012). Tocar a alguien centra el mapa. Se refresca
-/// cada 30 s mientras se ve y al volver a la app. El boton rojo de SOS flota sobre el mapa.
+/// Inicio: el mapa del grupo elegido, a pantalla completa, con un marcador por miembro. El boton de
+/// la lupa abre la lista de personas con la hora de su ultima posicion, la bateria o «En pausa»
+/// (FR-012); elegir a alguien cierra la lista y centra el mapa en esa persona. Atras cierra la lista
+/// antes que nada (Mobile §7). Se refresca cada 30 s mientras se ve y al volver a la app. El boton
+/// rojo de SOS flota sobre el mapa.
 /// </summary>
-public sealed class MapPage : ContentPage
+public sealed class MapPage : ContentPage, IBackHandler
 {
     private static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(30);
 
@@ -25,6 +27,10 @@ public sealed class MapPage : ContentPage
     private readonly VerticalStackLayout _list = new() { Spacing = 0 };
     private readonly Label _listTitle = new();
     private readonly ActivityIndicator _busy = new() { IsRunning = false, IsVisible = false, HeightRequest = 24 };
+    private readonly Grid _people = new() { IsVisible = false };
+    private readonly Border _noGroups = new() { IsVisible = false };
+    private readonly ImageButton _search = new();
+    private VerticalStackLayout _corner = new();
 
     private IReadOnlyList<Group> _groups = [];
     private IDispatcherTimer? _timer;
@@ -67,22 +73,61 @@ public sealed class MapPage : ContentPage
         SemanticProperties.SetDescription(fit, Loc.Get("ShowEveryone"));
         fit.Clicked += (_, _) => _ = _map.RunAsync("fitMembers()");
 
-        var mapArea = new Grid { Children = { _map, fit, sos } };
+        // Lupa: abajo a la derecha, encima del SOS (que no se tapen); el «i» de la atribucion va abajo
+        // a la izquierda y el zoom arriba a la derecha.
+        _search.Source = "ic_search_w.png";
+        _search.Style = Ui.Style("MapFabButton");
+        _search.HorizontalOptions = LayoutOptions.End;
+        SemanticProperties.SetDescription(_search, Loc.Get("FindPerson"));
+        _search.Clicked += (_, _) => ShowPeople(true);
 
+        sos.Margin = new Thickness(0);
+        var corner = _corner = new VerticalStackLayout
+        {
+            Spacing = 12,
+            Margin = new Thickness(16),
+            HorizontalOptions = LayoutOptions.End,
+            VerticalOptions = LayoutOptions.End,
+            Children = { _search, sos },
+        };
+
+        // Sin grupos: una tarjeta abajo con el camino a Grupos (lo que antes decia la lista).
+        _noGroups.Style = Ui.Style("BottomSheet");
+        _noGroups.VerticalOptions = LayoutOptions.End;
+
+        // La lista de personas: una hoja sobre el mapa; tocar fuera la cierra.
         var sheet = new Border
         {
             Style = Ui.Style("BottomSheet"),
+            VerticalOptions = LayoutOptions.End,
             Content = new VerticalStackLayout
             {
                 Padding = new Thickness(16, 12, 16, 8),
                 Spacing = 6,
                 Children =
                 {
-                    UiKit.Row(_listTitle, _busy),
-                    new ScrollView { MaximumHeightRequest = 260, Content = _list },
+                    UiKit.Row(_listTitle, new HorizontalStackLayout
+                    {
+                        Spacing = 4,
+                        Children =
+                        {
+                            _busy,
+                            UiKit.Icon("ic_center.png", async (_, _) => { ShowPeople(false); await _map.RunAsync("fitMembers()"); }, Loc.Get("ShowEveryone")),
+                            UiKit.Icon("ic_close.png", (_, _) => ShowPeople(false), Loc.Get("Close")),
+                        },
+                    }),
+                    new ScrollView { MaximumHeightRequest = 360, Content = _list },
                 },
             },
         };
+        var shade = new BoxView { Color = Colors.Black, Opacity = 0.25 };
+        var closeTap = new TapGestureRecognizer();
+        closeTap.Tapped += (_, _) => ShowPeople(false);
+        shade.GestureRecognizers.Add(closeTap);
+        _people.Children.Add(shade);
+        _people.Children.Add(sheet);
+
+        var mapArea = new Grid { Children = { _map, fit, corner, _noGroups, _people } };
 
         var top = new Border
         {
@@ -98,13 +143,11 @@ public sealed class MapPage : ContentPage
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
-                new RowDefinition(GridLength.Auto),
             ],
         };
         root.Add(top, 0, 0);
         root.Add(_banners, 0, 1);
         root.Add(mapArea, 0, 2);
-        root.Add(sheet, 0, 3);
         Content = root;
     }
 
@@ -142,9 +185,18 @@ public sealed class MapPage : ContentPage
 
     private bool _centeredOnMe;
 
+    /// <summary>La ultima lectura de este movil: mi marca se pinta ahi, no en la del servidor.</summary>
+    private (double Lat, double Lon, DateTimeOffset At)? _myFix;
+
+    private IReadOnlyList<Member> _members = [];
+    private IReadOnlyList<MemberPosition> _positions = [];
+
     /// <summary>
-    /// Mi posicion en el mapa: punto azul con su circulo de precision. Con <paramref name="center"/>
-    /// (al abrir) se centra en ella; si no hay permiso o lectura, se encuadra al grupo como antes.
+    /// Mi posicion en el mapa: mi propia marca (foto o inicial con mi nombre) se pinta en la lectura
+    /// de este movil, que es mas reciente que la del servidor (la ReadingPolicy no envia las lecturas
+    /// con el movil quieto). Nada de punto azul aparte: eran dos marcas para la misma persona. Con
+    /// <paramref name="center"/> (al abrir) se centra en ella; si no hay permiso o lectura, mi marca
+    /// va en la posicion del servidor y se encuadra al grupo como antes.
     /// </summary>
     private async Task ShowMeAsync(bool center)
     {
@@ -169,7 +221,12 @@ public sealed class MapPage : ContentPage
             return;
         }
 
-        await _map.RunAsync($"setMe({MapView.Num(p.Lat)}, {MapView.Num(p.Lon)}, {MapView.Num(p.Accuracy)})");
+        _myFix = (p.Lat, p.Lon, p.At);
+        if (_members.Count > 0 && _groups.FirstOrDefault(g => g.Id == AppState.SelectedGroup) is { KeyMissing: false } group)
+        {
+            ShowList(group, _members, _positions);
+            await _map.RunAsync($"setMembers({MapView.Json(MarkerItems())})");
+        }
         if (center)
         {
             _centeredOnMe = true;
@@ -177,9 +234,21 @@ public sealed class MapPage : ContentPage
         }
     }
 
+    /// <summary>Atras con la lista abierta: se cierra la lista y el mapa se queda.</summary>
+    public bool HandleBack()
+    {
+        if (!_people.IsVisible)
+            return false;
+        ShowPeople(false);
+        return true;
+    }
+
+    private void ShowPeople(bool show) => _people.IsVisible = show;
+
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        ShowPeople(false);
         _timer?.Stop();
         _map.StopEvents();
         App.AppResumed -= OnResumed;
@@ -230,6 +299,8 @@ public sealed class MapPage : ContentPage
 
             if (_groups.Count == 0)
             {
+                _members = [];
+                _positions = [];
                 ShowNoGroups();
                 await _map.RunAsync("setMembers([])");
                 return;
@@ -240,6 +311,8 @@ public sealed class MapPage : ContentPage
 
             if (group.KeyMissing)
             {
+                _members = [];
+                _positions = [];
                 ShowList(group, [], []);
                 await _map.RunAsync("setMembers([])");
                 return;
@@ -251,8 +324,10 @@ public sealed class MapPage : ContentPage
             var members = membersTask.Result;
             var positions = positionsTask.Result;
 
+            _members = members;
+            _positions = positions;
             ShowList(group, members, positions);
-            await DrawAsync(members, positions);
+            await DrawAsync();
 
             _ = AppChores.EnsureSharingAsync(true);
         }
@@ -335,14 +410,28 @@ public sealed class MapPage : ContentPage
 
     private void ShowNoGroups()
     {
-        _listTitle.Text = Loc.Get("NoGroupsTitle");
         _list.Clear();
-        _list.Add(UiKit.Body(Loc.Get("NoGroupsBody")));
-        _list.Add(UiKit.Primary(Loc.Get("GoToGroups"), "ic_group_w.png", async (_, _) => await Shell.Current.GoToAsync("//GroupsPage")));
+        ShowPeople(false);
+        // Sin grupos no hay a quien buscar ni a quien mandar un SOS, y la tarjeta ocupa ese sitio.
+        _corner.IsVisible = false;
+        _noGroups.Content = new VerticalStackLayout
+        {
+            Padding = new Thickness(16, 12, 16, 8),
+            Spacing = 6,
+            Children =
+            {
+                new Label { Text = Loc.Get("NoGroupsTitle"), Style = Ui.Style("CardTitle") },
+                UiKit.Body(Loc.Get("NoGroupsBody")),
+                UiKit.Primary(Loc.Get("GoToGroups"), "ic_group_w.png", async (_, _) => await Shell.Current.GoToAsync("//GroupsPage")),
+            },
+        };
+        _noGroups.IsVisible = true;
     }
 
     private void ShowList(Group group, IReadOnlyList<Member> members, IReadOnlyList<MemberPosition> positions)
     {
+        _noGroups.IsVisible = false;
+        _corner.IsVisible = true;
         _listTitle.Text = group.KeyMissing ? Loc.Get("GroupNoKeyName") : group.Name;
         _list.Clear();
 
@@ -356,8 +445,31 @@ public sealed class MapPage : ContentPage
         foreach (var member in members.OrderByDescending(m => m.IsMe).ThenBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase))
         {
             byUser.TryGetValue(member.UserId, out var position);
+            // Yo: la hora de la lectura de este movil si es mas nueva (la marca del mapa va ahi).
+            if (member.IsMe && _myFix is { } fix && (position is null || fix.At > position.At))
+                position = new MemberPosition(member.UserId, fix.Lat, fix.Lon, 0, MyBattery(position), fix.At);
             _list.Add(MemberRow(member, position));
         }
+    }
+
+    private static int MyBattery(MemberPosition? server)
+    {
+        try
+        {
+#if ANDROID
+            // BatteryManager directamente: el Battery de MAUI exige BATTERY_STATS, que no se declara.
+            var context = Android.App.Application.Context;
+            var manager = (Android.OS.BatteryManager?)context.GetSystemService(Android.Content.Context.BatteryService);
+            var level = manager?.GetIntProperty((int)Android.OS.BatteryProperty.Capacity) ?? -1;
+            if (level is >= 0 and <= 100)
+                return level;
+#endif
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Info($"mapa: no se pudo leer la bateria: {ex.Message}");
+        }
+        return server?.Battery ?? 0;
     }
 
     private View MemberRow(Member member, MemberPosition? position)
@@ -394,35 +506,56 @@ public sealed class MapPage : ContentPage
         if (position is not null)
         {
             var tap = new TapGestureRecognizer();
-            tap.Tapped += (_, _) => _ = _map.RunAsync($"focusMember('{member.UserId:D}')");
+            tap.Tapped += (_, _) =>
+            {
+                ShowPeople(false);
+                _ = _map.RunAsync($"focusMember('{member.UserId:D}')");
+            };
             row.GestureRecognizers.Add(tap);
+            SemanticProperties.SetDescription(row, $"{name}, {detail}");
         }
 
         return row;
     }
 
-    private async Task DrawAsync(IReadOnlyList<Member> members, IReadOnlyList<MemberPosition> positions)
+    /// <summary>
+    /// Las marcas del mapa: cada miembro que no esta en pausa, en su ultima posicion del servidor; yo,
+    /// en la lectura de este movil si la hay y es mas nueva.
+    /// </summary>
+    private List<object> MarkerItems()
     {
-        var byUser = members.GroupBy(m => m.UserId).ToDictionary(g => g.Key, g => g.First());
-        var items = positions
-            .Where(p => byUser.TryGetValue(p.UserId, out var m) && !m.Paused)
-            .Select(p =>
-            {
-                var m = byUser[p.UserId];
-                return new
-                {
-                    id = p.UserId.ToString("D"),
-                    name = m.Name,
-                    initials = Avatars.Initials(m.Name),
-                    color = Avatars.ColorFor(m.UserId),
-                    avatar = m.AvatarBase64,
-                    lat = p.Lat,
-                    lon = p.Lon,
-                    stale = DateTimeOffset.Now - p.At > TimeSpan.FromHours(1),
-                };
-            })
-            .ToList();
+        var byUser = _positions.GroupBy(p => p.UserId).ToDictionary(g => g.Key, g => g.MaxBy(p => p.At)!);
+        var items = new List<object>();
+        foreach (var m in _members.Where(m => !m.Paused))
+        {
+            byUser.TryGetValue(m.UserId, out var server);
+            double lat, lon;
+            DateTimeOffset at;
+            if (m.IsMe && _myFix is { } fix && (server is null || fix.At >= server.At))
+                (lat, lon, at) = fix;
+            else if (server is not null)
+                (lat, lon, at) = (server.Lat, server.Lon, server.At);
+            else
+                continue;
 
+            items.Add(new
+            {
+                id = m.UserId.ToString("D"),
+                name = m.Name,
+                initials = Avatars.Initials(m.Name),
+                color = Avatars.ColorFor(m.UserId),
+                avatar = m.AvatarBase64,
+                lat,
+                lon,
+                stale = DateTimeOffset.Now - at > TimeSpan.FromHours(1),
+            });
+        }
+        return items;
+    }
+
+    private async Task DrawAsync()
+    {
+        var items = MarkerItems();
         await _map.RunAsync($"setMembers({MapView.Json(items)})");
 
         // Abierto desde un aviso (SOS, zona): al sitio del evento, o a todo el grupo.

@@ -16,6 +16,7 @@ supabase/
   migrations/04_cron.sql       pg_cron: retención de 30 días y caducidades
   migrations/05_coarse.sql     posiciones aproximadas (fuera del historial)
   migrations/06_clear_history.sql  RPC clear_my_history: borrar mi historial
+  migrations/07_expulsion.sql  al expulsado no le vale un código de antes de la expulsión
   functions/notify             avisos FCM (solo datos)
   functions/link-account       vincular Google / Microsoft
   functions/recover-account    recuperar la cuenta en un móvil nuevo
@@ -50,6 +51,10 @@ desprogramar antes de programar). Se aplican **en orden**:
 6. `06_clear_history.sql` — `clear_my_history()`: borra las posiciones del propio usuario en todos
    sus grupos y conserva `last_positions`. Sin parámetros (el usuario sale de `auth.uid()`); la tabla
    sigue sin `DELETE` para `authenticated`.
+7. `07_expulsion.sql` — tabla `group_removals` (cuándo se expulsó a quién de qué grupo; sin texto,
+   solo la tocan funciones `SECURITY DEFINER`), `remove_member` que la rellena y un disparador en
+   `join_requests` que rechaza con `expired` una solicitud hecha con un código creado antes de la
+   expulsión.
 
 ### Cómo aplicarlas
 
@@ -59,7 +64,7 @@ desprogramar antes de programar). Se aplican **en orden**:
 túnel SSH, ver más abajo):
 
 ```sh
-for f in 01_schema 02_rls 03_functions 04_cron 05_coarse 06_clear_history; do
+for f in 01_schema 02_rls 03_functions 04_cron 05_coarse 06_clear_history 07_expulsion; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/$f.sql || break
 done
 ```
@@ -79,7 +84,7 @@ done
 
 | Función | Qué hace |
 |---|---|
-| `notify` | `{type, id}` con el JWT del usuario. Comprueba que quien llama es el autor del evento (en `request_resolved`, el admin que lo resolvió), calcula los destinatarios en ese momento (tabla del §7) y manda por FCM HTTP v1 un mensaje **solo de datos** `{type, group_id, event_id, actor_id, zone_id?, kind?}`; `android.priority = HIGH` para `sos`. Borra los tokens que FCM da por muertos (`UNREGISTERED` / `NOT_FOUND`). Sin `FCM_SERVICE_ACCOUNT` responde `200 {"sent":0,"reason":"fcm_not_configured"}`: la app tiene sondeo de reserva cada 60 s. |
+| `notify` | `{type, id}` con el JWT del usuario. Comprueba que quien llama es el autor del evento (en `request_resolved`, el admin que lo resolvió), calcula los destinatarios en ese momento (tabla del §7; en `request_resolved`, además del solicitante, los demás admins, para que quiten el aviso de la solicitud) y manda por FCM HTTP v1 un mensaje **solo de datos** `{type, group_id, event_id, actor_id, zone_id?, kind?}`; `android.priority = HIGH` para `sos`. Borra los tokens que FCM da por muertos (`UNREGISTERED` / `NOT_FOUND`). Sin `FCM_SERVICE_ACCOUNT` responde `200 {"sent":0,"reason":"fcm_not_configured"}`: la app tiene sondeo de reserva cada 60 s. |
 | `link-account` | `{provider, id_token}`. Verifica la firma con el JWKS del proveedor, el emisor y la audiencia, y guarda `account_links`. Google: `subject = sub`, emisor `accounts.google.com` o `https://accounts.google.com`. Microsoft: `subject = oid`, emisor `https://login.microsoftonline.com/{tid}/v2.0` con el `tid` del propio token. `409 {"error":"already_linked"}` si la cuenta es de otro usuario. |
 | `recover-account` | `{provider, id_token}` con el JWT del usuario anónimo del móvil nuevo. `404 {"error":"not_linked"}` si no hay vínculo; `409 {"error":"not_empty"}` si el usuario nuevo ya está en algún grupo (nunca se fusiona); si no, `transfer_user(viejo, nuevo)` con `service_role` y borra el viejo con `auth.admin.deleteUser`. |
 

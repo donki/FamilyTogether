@@ -86,6 +86,13 @@ public class FamilyTogetherMessagingService : FirebaseMessagingService
         if (!data.TryGetValue("event_id", out var eventText) || !Guid.TryParse(eventText, out var eventId))
             return;
 
+        var notifier = PlatformServiceLocator.Get<INotifier>() ?? new Notifier();
+
+        // Otro administrador ha resuelto una solicitud: el aviso «X quiere unirse» (mismo event_id)
+        // ya no pinta nada en la barra. Si la solicitud es mía, justo después sale su resolución.
+        if (type == EventTypes.RequestResolved)
+            notifier.Cancel(eventId);
+
         var feed = PlatformServiceLocator.Get<EventFeed>();
         if (feed is null)
             return;
@@ -94,7 +101,6 @@ public class FamilyTogetherMessagingService : FirebaseMessagingService
         if (content is null)
             return;   // Repetido o ya no aplica.
 
-        var notifier = PlatformServiceLocator.Get<INotifier>() ?? new Notifier();
         notifier.Show(content);
     }
 }

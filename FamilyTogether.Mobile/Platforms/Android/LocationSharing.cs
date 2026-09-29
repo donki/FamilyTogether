@@ -252,33 +252,53 @@ public sealed class LocationSharing : ILocationSharing
 
     private enum Vendor { Other, Xiaomi, Huawei, Oppo, Vivo, Samsung, Asus, Meizu }
 
+    /// <summary>
+    /// El fabricante, por <c>Build.Manufacturer</c> y, si no dice nada conocido, por <c>Build.Brand</c>.
+    /// Un Android sobre x86 es un emulador (MuMu, por ejemplo, se declara Samsung de arriba abajo):
+    /// no se sabe qué capa lleva y se trata como desconocido.
+    /// </summary>
     private static Vendor CurrentVendor
     {
         get
         {
-            var text = $"{Build.Manufacturer} {Build.Brand}".ToLowerInvariant();
-            if (text.Contains("xiaomi") || text.Contains("redmi") || text.Contains("poco")) return Vendor.Xiaomi;
-            if (text.Contains("huawei") || text.Contains("honor")) return Vendor.Huawei;
-            if (text.Contains("oppo") || text.Contains("realme") || text.Contains("oneplus")) return Vendor.Oppo;
-            if (text.Contains("vivo") || text.Contains("iqoo")) return Vendor.Vivo;
-            if (text.Contains("samsung")) return Vendor.Samsung;
-            if (text.Contains("asus")) return Vendor.Asus;
-            if (text.Contains("meizu")) return Vendor.Meizu;
-            return Vendor.Other;
+            if (IsX86)
+                return Vendor.Other;
+
+            var byManufacturer = VendorOf(Build.Manufacturer);
+            return byManufacturer != Vendor.Other ? byManufacturer : VendorOf(Build.Brand);
         }
     }
 
-    public string? ManufacturerAutostartHint => CurrentVendor switch
+    private static bool IsX86
     {
-        Vendor.Xiaomi => AndroidTexts.Get("AutostartXiaomi"),
-        Vendor.Huawei => AndroidTexts.Get("AutostartHuawei"),
-        Vendor.Oppo => AndroidTexts.Get("AutostartOppo"),
-        Vendor.Vivo => AndroidTexts.Get("AutostartVivo"),
-        Vendor.Samsung => AndroidTexts.Get("AutostartSamsung"),
-        Vendor.Asus => AndroidTexts.Get("AutostartAsus"),
-        Vendor.Meizu => AndroidTexts.Get("AutostartMeizu"),
-        _ => null,
-    };
+        get
+        {
+            var abi = Build.SupportedAbis?.FirstOrDefault() ?? string.Empty;
+            return abi.StartsWith("x86", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static Vendor VendorOf(string? value)
+    {
+        var text = (value ?? string.Empty).ToLowerInvariant();
+        if (text.Contains("xiaomi") || text.Contains("redmi") || text.Contains("poco")) return Vendor.Xiaomi;
+        if (text.Contains("huawei") || text.Contains("honor")) return Vendor.Huawei;
+        if (text.Contains("oppo") || text.Contains("realme") || text.Contains("oneplus")) return Vendor.Oppo;
+        if (text.Contains("vivo") || text.Contains("iqoo")) return Vendor.Vivo;
+        if (text.Contains("samsung")) return Vendor.Samsung;
+        if (text.Contains("asus")) return Vendor.Asus;
+        if (text.Contains("meizu")) return Vendor.Meizu;
+        return Vendor.Other;
+    }
+
+    /// <summary>
+    /// Solo Xiaomi, Redmi y POCO tienen texto propio (constitución General §6.13: no se nombran otros
+    /// fabricantes). Los demás, conocidos o no, reciben el genérico; el botón abre la pantalla del
+    /// fabricante si se conoce y, si no, los ajustes de la app.
+    /// </summary>
+    public string? ManufacturerAutostartHint => CurrentVendor == Vendor.Xiaomi
+        ? AndroidTexts.Get("AutostartXiaomi")
+        : AndroidTexts.Get("AutostartGeneric");
 
     /// <summary>
     /// Pantallas conocidas de autoinicio / ahorro de batería de cada capa. Cambian entre versiones,

@@ -144,7 +144,11 @@ y la app traduce la clave: `not_member`, `not_admin`, `expired`, `not_found`, `a
 - `leave_group` y `remove_member` borran las posiciones, suscripciones de zona (como observador y
   como seguido) y peticiones de clave de esa persona en ese grupo (FR-024).
 - Al expulsado o rechazado **no le vale ninguna invitación creada antes** de su última resolución:
-  `expired`.
+  `expired`. Desde el 2026-09-29 (`07_expulsion.sql`) cuenta también la expulsión: `remove_member`
+  apunta la hora en `group_removals (group_id, user_id, removed_at)` —sin texto; RLS activada, sin
+  políticas ni permisos para `anon`/`authenticated`— y un disparador en `join_requests` rechaza con
+  `expired` la solicitud hecha con un código creado antes de esa hora (en la prueba de dos móviles,
+  un código creado después de entrar y antes de la expulsión le servía).
 - `create_sos` ignora los grupos de los que ya no es miembro (un SOS encolado sin conexión no se
   queda reintentando sin fin); si no queda ninguno, `not_member`.
 - Errores que no son de negocio: `28000 auth_required` (sin sesión) y `22023 invalid_*`
@@ -169,7 +173,7 @@ autor** (o el admin que lo resolvió) y calcula los destinatarios en ese momento
 | `type` | Destinatarios | Canal Android |
 |---|---|---|
 | `join_request` | admins del grupo | `requests` |
-| `request_resolved` | el solicitante | `requests` |
+| `request_resolved` | el solicitante; y los demás admins del grupo, que solo quitan de la barra el aviso de la solicitud (mismo `event_id`) | `requests` |
 | `key_share` | miembros del grupo menos el que pide | (silencioso) |
 | `sos` | miembros de los grupos destino menos quien lo envía | `sos` (alta prioridad) |
 | `zone_event` | observadores con suscripción a (usuario, zona) con `on_enter`/`on_exit` según `kind`, que sigan siendo miembros | `zones` |

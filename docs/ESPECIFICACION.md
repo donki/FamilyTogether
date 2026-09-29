@@ -107,7 +107,15 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   estrictos el grupo no veía a nadie en interiores. Si en 10 minutos no hay ninguna lectura de 25 m
   o mejor, se envía la mejor que haya (hasta 100 m) marcada como aproximada (`positions.coarse`):
   actualiza la última posición del mapa pero no entra en el historial ni en las zonas.
-- **Al abrir, el mapa se centra en mi posición** (punto azul con su precisión), no en todo el grupo.
+- **Al abrir, el mapa se centra en mi posición**, no en todo el grupo. **Mi marca** (foto o inicial
+  con mi nombre) se pinta en la **lectura de este móvil** (la más reciente), no en la del servidor,
+  que puede ir con retraso porque la ReadingPolicy no envía las lecturas con el móvil quieto
+  (2026-09-29: el punto azul aparte daba dos marcas para la misma persona y se quitó). Sin permiso
+  ni lectura propia, mi marca va en la del servidor. Los demás, siempre con la del servidor. No
+  cambia lo que se envía al grupo.
+- **Mapa a pantalla completa (2026-09-29)**: sin lista debajo. La lupa (**Buscar a una persona**,
+  abajo a la derecha, encima del SOS) abre la lista del grupo (avatar, hora y batería o «En
+  pausa»); elegir a alguien la cierra y centra el mapa en esa persona. Atrás la cierra primero.
 - **Mapa** con MapLibre GL JS 4.7.1 **empaquetado** en la app (Hiker lo carga de unpkg: aquí no).
 - **Borrar mi historial (2026-09-27)**: en Ajustes y en Historial. Borra mis posiciones en todos
   mis grupos (y lo que queda en cola, salvo la lectura más reciente) y **conserva la última

@@ -123,6 +123,18 @@ public sealed class Notifier : INotifier
         }
     }
 
+    public void Cancel(Guid eventId)
+    {
+        try
+        {
+            NotificationManagerCompat.From(global::Android.App.Application.Context)?.Cancel(NotificationIdFor(eventId));
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo quitar un aviso.", ex);
+        }
+    }
+
     /// <summary>
     /// Crea (o actualiza el nombre de) los cuatro canales. Idempotente: Android solo cambia el
     /// nombre y la descripción de un canal existente; sonido, importancia y demás los manda ya el

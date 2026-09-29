@@ -89,6 +89,10 @@ public sealed class ZoneAlertsPage : ContentPage
             var enter = new Switch { IsToggled = current?.OnEnter == true };
             var exit = new Switch { IsToggled = current?.OnExit == true };
 
+            // El lector de pantalla solo oiría «interruptor»: persona, zona y sentido.
+            SemanticProperties.SetDescription(enter, Loc.Format("AlertOnEnterA11y", member.Name, zone.Name));
+            SemanticProperties.SetDescription(exit, Loc.Format("AlertOnExitA11y", member.Name, zone.Name));
+
             enter.Toggled += async (_, _) => await SaveAsync(member.UserId, zone.Id, enter, exit);
             exit.Toggled += async (_, _) => await SaveAsync(member.UserId, zone.Id, enter, exit);
 

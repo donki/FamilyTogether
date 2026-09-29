@@ -66,7 +66,10 @@ async function deliveries(db: SupabaseClient, type: EventType, id: string, me: s
         db, "join_requests", "group_id, user_id, status, resolved_by", id);
       if (r.status === "pending") throw new NotifyError(409, "not_resolved");
       if (r.resolved_by !== me) throw new NotifyError(403, "not_author");
-      return [{ userId: r.user_id, data: base(r.group_id, me) }];
+      // El solicitante, para que sepa si entra; y los demas admins, en silencio, para que quiten de
+      // la barra el aviso «X quiere unirse» (su id es el mismo event_id).
+      const others = (await members(db, r.group_id, true)).filter((u) => u !== me && u !== r.user_id);
+      return [r.user_id, ...others].map((u) => ({ userId: u, data: base(r.group_id, me) }));
     }
 
     case "key_share": {

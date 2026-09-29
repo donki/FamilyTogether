@@ -239,7 +239,11 @@ public sealed class GroupDetailPage : ContentPage
     private async Task ResolveAsync(JoinRequest request, bool approve)
     {
         if (await Ui.RunAsync(this, () => approve ? _family.ApproveAsync(request) : _family.RejectAsync(request)))
+        {
+            // El aviso «X quiere unirse» lleva el id de la solicitud: resuelta, fuera de la barra.
+            ServiceHelper.TryGet<INotifier>()?.Cancel(request.Id);
             await LoadAsync();
+        }
     }
 
     private async Task ToggleAdminAsync(Member member)

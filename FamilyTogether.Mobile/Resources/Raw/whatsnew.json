@@ -1,5 +1,21 @@
 [
   {
+    "version": "2026.09.29.00",
+    "date": "2026-09-29",
+    "es": [
+      "El mapa ocupa toda la pantalla. Para ver la lista del grupo, toca la lupa (abajo a la derecha): al elegir a alguien, el mapa se centra en esa persona.",
+      "Tu propia marca (tu foto o tu inicial) sale donde está tu móvil ahora; ya no hay un punto azul aparte.",
+      "Al aprobar o rechazar una solicitud, su aviso desaparece de la barra, también en los móviles de los demás administradores.",
+      "Mejor con el lector de pantalla: los botones del mapa y los avisos de zonas dicen lo que hacen en tu idioma."
+    ],
+    "en": [
+      "The map fills the screen. To see the group list, tap the magnifying glass (bottom right): choosing someone centres the map on them.",
+      "Your own marker (your photo or initial) shows where your phone is right now; there is no separate blue dot any more.",
+      "When you approve or reject a request, its notification disappears, also on the other admins' phones.",
+      "Better with a screen reader: the map buttons and the zone alerts say what they do in your language."
+    ]
+  },
+  {
     "version": "2026.09.28.00",
     "date": "2026-09-28",
     "es": [

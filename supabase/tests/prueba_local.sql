@@ -2,7 +2,7 @@
 --
 -- Simula lo minimo de Supabase (esquema auth con auth.users y auth.uid(), roles anon /
 -- authenticated / service_role, privilegios por defecto que concede Supabase y, si no hay
--- pg_cron, un esquema cron de pega), aplica 01-04 DOS veces (tienen que ser relanzables) y
+-- pg_cron, un esquema cron de pega), aplica 01-04 y 07 DOS veces (tienen que ser relanzables) y
 -- ejercita los flujos con varios usuarios. Cualquier fallo corta el script con un error.
 --
 --   psql -p 54317 -U postgres -d familytogether_test -v ON_ERROR_STOP=1 -f supabase/tests/prueba_local.sql
@@ -204,11 +204,13 @@ insert into auth.users (id) values (:'u1'), (:'u2'), (:'u3'), (:'u4'), (:'u5');
 \ir ../migrations/02_rls.sql
 \ir ../migrations/03_functions.sql
 \ir ../migrations/04_cron.sql
+\ir ../migrations/07_expulsion.sql
 \echo '== Migraciones (segunda pasada: relanzables)'
 \ir ../migrations/01_schema.sql
 \ir ../migrations/02_rls.sql
 \ir ../migrations/03_functions.sql
 \ir ../migrations/04_cron.sql
+\ir ../migrations/07_expulsion.sql
 
 select test.ok((select count(*) from cron.job where jobname like 'familytogether_%') = 2,
                'pg_cron: dos tareas, sin duplicar al relanzar');
@@ -219,8 +221,8 @@ select test.ok((select schedule from cron.job where jobname = 'familytogether_ex
 select test.ok((select bool_and(c.relrowsecurity) from pg_class c join pg_namespace s on s.oid = c.relnamespace
                 where s.nspname = 'public' and c.relkind = 'r')
                and (select count(*) from pg_class c join pg_namespace s on s.oid = c.relnamespace
-                    where s.nspname = 'public' and c.relkind = 'r') = 14,
-               'RLS activada en las 14 tablas');
+                    where s.nspname = 'public' and c.relkind = 'r') = 15,
+               'RLS activada en las 15 tablas');
 select test.ok(not has_function_privilege('authenticated', 'public.transfer_user(uuid,uuid)', 'execute')
                and not has_function_privilege('anon', 'public.transfer_user(uuid,uuid)', 'execute')
                and has_function_privilege('service_role', 'public.transfer_user(uuid,uuid)', 'execute'),
@@ -559,6 +561,8 @@ insert into public.positions (group_id, user_id, recorded_at, battery, payload_e
 values (:'ga', :'u2', now(), 48, 'enc1:q3');
 insert into public.zone_subscriptions (observer_id, group_id, target_id, zone_id) values (:'u2', :'ga', :'u1', :'zone1');
 :as_u1
+-- Un codigo creado despues de que entrara y antes de expulsarlo (visto en la prueba del 2026-09-29).
+select code as code_pre from public.create_invitation(:'ga', 'invpubPre', 'enc1:invprivPre') \gset
 select public.remove_member(:'ga', :'u2');
 :as_root
 select test.ok((select count(*) from public.positions where group_id = :'ga' and user_id = :'u2') = 0
@@ -571,6 +575,8 @@ select test.ok((select count(*) from public.groups) = 0 and (select count(*) fro
                and (select count(*) from public.zones) = 0, 'expulsado: deja de ver el grupo al instante');
 select test.err(format('select public.request_join(%L, ''r'', ''n'')', :'code1'), 'expired',
                 'expulsado: la invitacion de antes no le sirve');
+select test.err(format('select public.request_join(%L, ''r'', ''n'')', :'code_pre'), 'expired',
+                'expulsado: tampoco la creada despues de entrar y antes de la expulsion');
 
 -- ===========================================================================
 -- 11. transfer_user (recuperar la cuenta)
@@ -649,6 +655,6 @@ select test.ok((select count(*) from public.invitations where code = 'EXPRED22')
 update public.invitations set expires_at = now() - interval '61 minutes' where code = 'EXPRED22';
 select public.expire_invitations_and_pauses();
 select test.ok((select count(*) from public.invitations where code = 'EXPRED22') = 0
-               and (select count(*) from public.invitations) = 2, 'invitacion caducada hace mas de 1 h: borrada');
+               and (select count(*) from public.invitations) = 3, 'invitacion caducada hace mas de 1 h: borrada');
 
 \echo '== TODAS LAS PRUEBAS PASAN'

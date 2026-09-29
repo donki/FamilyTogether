@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using FamilyTogether.Mobile.Localization;
 using FamilyTogether.Mobile.Services;
 
 namespace FamilyTogether.Mobile.Controls;
@@ -81,7 +82,8 @@ public sealed class MapView : ContentView
 
             // Sin BaseUrl, MAUI carga el HTML con base file:///android_asset/: ahi estan
             // maplibre-gl.js y maplibre-gl.css (Resources\Raw).
-            _web.Source = new HtmlWebViewSource { Html = await reader.ReadToEndAsync() };
+            var html = (await reader.ReadToEndAsync()).Replace("/*MAP_TEXT*/{}", Json(MapTexts()), StringComparison.Ordinal);
+            _web.Source = new HtmlWebViewSource { Html = html };
 
             for (var i = 0; i < 100; i++)
             {
@@ -110,6 +112,29 @@ public sealed class MapView : ContentView
             _ready.TrySetResult(false);
         }
     }
+
+    /// <summary>
+    /// Textos para el lector de pantalla en el idioma de la app: los de MapLibre (van en su
+    /// <c>locale</c>, que solo se lee al crear el mapa) y las etiquetas de nuestros marcadores.
+    /// </summary>
+    private static Dictionary<string, string> MapTexts() => new()
+    {
+        ["Map.Title"] = Loc.Get("MapA11yMap"),
+        ["Marker.Title"] = Loc.Get("MapA11yMarker"),
+        ["NavigationControl.ZoomIn"] = Loc.Get("MapA11yZoomIn"),
+        ["NavigationControl.ZoomOut"] = Loc.Get("MapA11yZoomOut"),
+        ["NavigationControl.ResetBearing"] = Loc.Get("MapA11yResetBearing"),
+        ["AttributionControl.ToggleAttribution"] = Loc.Get("MapA11yAttribution"),
+        ["AttributionControl.MapFeedback"] = Loc.Get("MapA11yFeedback"),
+        ["Popup.Close"] = Loc.Get("MapA11yClosePopup"),
+        ["member"] = Loc.Get("MapA11yMember"),
+        ["me"] = Loc.Get("MapA11yMe"),
+        ["zone"] = Loc.Get("MapA11yZone"),
+        ["zoneCenter"] = Loc.Get("MapA11yZoneCenter"),
+        ["stop"] = Loc.Get("MapA11yStop"),
+        ["start"] = Loc.Get("TrackStart"),
+        ["end"] = Loc.Get("TrackEnd"),
+    };
 
     private IDispatcherTimer CreateEventTimer()
     {

@@ -32,7 +32,7 @@ public interface ILocationSharing
 
     void OpenAppSettings();
 
-    /// <summary>Texto localizado para Xiaomi, Huawei, Samsung…, o <c>null</c> si no hace falta.</summary>
+    /// <summary>Texto localizado del paso de inicio automático: el de Xiaomi, Redmi y POCO o el genérico.</summary>
     string? ManufacturerAutostartHint { get; }
 
     void OpenManufacturerAutostartSettings();
@@ -54,4 +54,7 @@ public interface INotifier
     Task<bool> RequestPermissionAsync();
 
     void Show(FamilyTogether.Core.NotificationContent content);
+
+    /// <summary>Quita de la barra el aviso de ese evento, si sigue ahí (p. ej. una solicitud ya resuelta).</summary>
+    void Cancel(Guid eventId);
 }

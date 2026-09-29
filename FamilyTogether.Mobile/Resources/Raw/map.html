@@ -44,8 +44,28 @@
         // EvaluateJavaScriptAsync, y una cola de eventos (toques) que C# recoge con takeEvents().
         // Los eventos van como texto plano sin comillas («tap|lat|lon;member|id»): asi no hay que
         // pelearse con como devuelve cada WebView una cadena JSON escapada.
+        // Textos en el idioma de la app para el lector de pantalla; MapView.cs sustituye el marcador
+        // de abajo. Los de MapLibre van en «locale» (solo se leen al crear el mapa); el resto son las
+        // etiquetas de nuestros marcadores. Sin sustituir (p. ej. abriendo el fichero suelto), inglés.
+        var T = /*MAP_TEXT*/{};
+        function t(key, fallback, arg) {
+            var s = T[key] || fallback;
+            return arg === undefined ? s : s.replace('{0}', arg);
+        }
+        var locale = {};
+        Object.keys(T).forEach(function (k) { if (k.indexOf('.') > 0) locale[k] = T[k]; });
+
+        // MapLibre pone «Map marker» a cada marcador al añadirlo: se cambia por lo que es.
+        function label(marker, text) {
+            var el = marker.getElement();
+            el.setAttribute('aria-label', text);
+            el.setAttribute('role', 'img');
+            return marker;
+        }
+
         var map = new maplibregl.Map({
             container: 'map',
+            locale: locale,
             style: 'https://tiles.openfreemap.org/styles/liberty',
             center: [-3.7038, 40.4168],  // [lng, lat]: MapLibre usa lng,lat
             zoom: 5,
@@ -148,6 +168,7 @@
                     marker = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, -22] }).setLngLat([m.lon, m.lat]).addTo(map);
                     memberMarkers[m.id] = marker;
                 }
+                label(marker, t('member', '{0}, on the map', m.name)).getElement().setAttribute('role', 'button');
                 var root = marker.getElement();
                 var dot = root.querySelector('.fl-dot');
                 dot.style.backgroundColor = m.color;
@@ -171,7 +192,9 @@
             var pts = Object.keys(memberPositions).map(function (k) { return memberPositions[k]; });
             if (pts.length === 0) return;
             if (pts.length === 1) { map.easeTo({ center: pts[0], zoom: 15, duration: 600 }); return; }
-            map.fitBounds(boundsOf(pts), { padding: 60, maxZoom: 16, duration: 600 });
+            // Abajo a la derecha flotan la lupa y el SOS, y arriba a la izquierda «Ver a todos»:
+            // más margen por esos lados para que ninguna marca quede debajo de un botón.
+            map.fitBounds(boundsOf(pts), { padding: { top: 90, bottom: 190, left: 60, right: 110 }, maxZoom: 16, duration: 600 });
         }
 
         function center(lat, lon, zoom) {
@@ -188,7 +211,7 @@
                 if (!meMarker) {
                     var el = document.createElement('div');
                     el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#1E88E5;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.4)';
-                    meMarker = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
+                    meMarker = label(new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map), t('me', 'Your position'));
                 } else {
                     meMarker.setLngLat([lon, lat]);
                 }
@@ -209,7 +232,7 @@
                     var el = document.createElement('div');
                     el.className = 'fl-zone-label';
                     el.textContent = z.name;
-                    zoneLabels.push(new maplibregl.Marker({ element: el }).setLngLat([z.lon, z.lat]).addTo(map));
+                    zoneLabels.push(label(new maplibregl.Marker({ element: el }).setLngLat([z.lon, z.lat]).addTo(map), t('zone', 'Zone {0}', z.name)));
                 });
                 map.getSource('zones').setData(fc);
             });
@@ -250,7 +273,7 @@
             if (!editMarker) {
                 var el = document.createElement('div');
                 el.className = 'fl-edit-center';
-                editMarker = new maplibregl.Marker({ element: el }).setLngLat([edit.lon, edit.lat]).addTo(map);
+                editMarker = label(new maplibregl.Marker({ element: el }).setLngLat([edit.lon, edit.lat]).addTo(map), t('zoneCenter', 'Zone centre'));
             } else {
                 editMarker.setLngLat([edit.lon, edit.lat]);
             }
@@ -275,8 +298,8 @@
                 map.getSource('track').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} });
             });
             if (coords.length === 0) return;
-            trackMarkers.push(endMarker(coords[0], startColor));
-            if (coords.length > 1) trackMarkers.push(endMarker(coords[coords.length - 1], endColor));
+            trackMarkers.push(label(endMarker(coords[0], startColor), t('start', 'Start')));
+            if (coords.length > 1) trackMarkers.push(label(endMarker(coords[coords.length - 1], endColor), t('end', 'End')));
             if (coords.length === 1) map.easeTo({ center: coords[0], zoom: 15, duration: 600 });
             else map.fitBounds(boundsOf(coords), { padding: 50, maxZoom: 17, duration: 600 });
         }
@@ -295,7 +318,7 @@
                 el.className = 'fl-stop';
                 var marker = new maplibregl.Marker({ element: el }).setLngLat([s[1], s[0]]);
                 if (s[2]) marker.setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setText(s[2]));
-                trackMarkers.push(marker.addTo(map));
+                trackMarkers.push(label(marker.addTo(map), s[2] || t('stop', 'Stop')));
             });
         }
 
