@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cobertura (coverlet): tambien el ensamblado de pruebas, porque ahi se compilan los ficheros de la
+  app MAUI enlazados (Strings, Loc, TimeTexts, NotificationTexts); el codigo de las propias pruebas
+  se excluye por ruta.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <IncludeTestAssembly>true</IncludeTestAssembly>
+          <ExcludeByFile>**/FamilyTogether.Core.Tests/**/*.cs</ExcludeByFile>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

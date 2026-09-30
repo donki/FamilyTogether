@@ -6,10 +6,16 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)coverage.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- xunit (Apache-2.0), su runner (Apache-2.0) y Microsoft.NET.Test.Sdk (MIT): solo para probar, no se distribuyen. -->
+    <!-- coverlet.collector (MIT): cobertura con dotnet test collect "XPlat Code Coverage". -->
+    <PackageReference Include="coverlet.collector" Version="10.1.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
@@ -20,6 +26,19 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    Logica pura del proyecto MAUI, enlazada tal cual (no se copia): textos es/en, Loc, horas y avisos.
+    Mobile\PreferencesShim.cs sustituye a Preferences de MAUI para poder compilarla aqui.
+  -->
+  <ItemGroup>
+    <Using Include="Microsoft.Maui.Storage" />
+    <Compile Include="..\FamilyTogether.Mobile\Localization\Strings.cs" Link="Mobile\Linked\Strings.cs" />
+    <Compile Include="..\FamilyTogether.Mobile\Localization\Loc.cs" Link="Mobile\Linked\Loc.cs" />
+    <Compile Include="..\FamilyTogether.Mobile\Services\TimeTexts.cs" Link="Mobile\Linked\TimeTexts.cs" />
+    <Compile Include="..\FamilyTogether.Mobile\Services\NotificationTexts.cs" Link="Mobile\Linked\NotificationTexts.cs" />
+    <None Include="..\FamilyTogether.Mobile\Resources\Raw\whatsnew.json" Link="Mobile\whatsnew.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
