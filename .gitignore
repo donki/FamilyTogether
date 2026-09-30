@@ -28,3 +28,6 @@ releases/
 *service-account*.json
 
 supabase/.temp/
+
+# Resultados y cobertura de dotnet test
+TestResults/
