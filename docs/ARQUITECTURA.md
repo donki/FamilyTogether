@@ -355,8 +355,12 @@ Los textos visibles de los avisos los monta la app con su localización a partir
   `recorded_at` (`gte`/`lt`, `coarse=is.false`, páginas de 1000) y filtrado otra vez en el móvil;
   cruza la medianoche sin más. «Un día» usa el mismo método con `DayRange`.
 - Si la persona elegida soy yo, se junta con `LocalTrack.GetAsync` (`LocalTrack.Merge`: por hora,
-  sin repetir la misma lectura al segundo, gana la del servidor). Si el servidor falla, sale el
-  aviso de error y se pinta igual lo del móvil.
+  sin repetir la misma lectura al segundo, gana la del servidor). Sin conexión (2026.10.01.01) no
+  sale diálogo: se pinta lo del móvil con la línea «Sin conexión: solo lo guardado en este móvil».
+  Para llegar ahí, el selector de grupo y la lista de personas recuerdan **en memoria** (no en
+  disco: nombres solo cifrados fuera del proceso) la última respuesta del servidor y la usan si
+  falla la red; si la app arranca ya sin red, sale el aviso de siempre. Para otra persona, el error
+  sale como siempre.
 - Horas del resumen y de las paradas: «18:30», «ayer 18:30» o fecha corta y hora
   (`TimeTexts.Clock`).
 

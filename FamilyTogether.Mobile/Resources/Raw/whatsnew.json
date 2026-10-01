@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.10.01.01",
+    "date": "2026-10-01",
+    "es": [
+      "Sin conexión, el Historial sigue enseñando tu recorrido de las últimas 24 horas guardado en el móvil (si ya habías abierto la app con conexión), sin avisos de error."
+    ],
+    "en": [
+      "Without a connection, History still shows your route for the last 24 hours stored on the phone (if you had opened the app with a connection before), without error messages."
+    ]
+  },
+  {
     "version": "2026.10.01.00",
     "date": "2026-10-01",
     "es": [

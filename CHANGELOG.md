@@ -1,5 +1,14 @@
 # Changelog — Family Together
 
+## 2026.10.01.01
+
+- **Historial sin conexión**: probado en MuMu sin red, la 2026.10.01.00 no llegaba a pintar la copia
+  local porque los grupos y los miembros se piden al servidor (y salían tres avisos de error).
+  Ahora el selector de grupo y la lista de personas recuerdan en memoria la última respuesta y, sin
+  conexión, la usan sin diálogo; mi recorrido se pinta con lo del móvil y una línea «Sin conexión:
+  solo lo guardado en este móvil». Si la app se abre ya sin red, sigue saliendo el aviso de
+  siempre (no se guardan nombres de grupo ni de personas en el móvil).
+
 ## 2026.10.01.00
 
 - **Historial: «Últimas 24 horas»**, la vista al abrir: de ahora menos 24 h a ahora, cruzando la

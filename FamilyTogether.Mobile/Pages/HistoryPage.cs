@@ -46,6 +46,9 @@ public sealed class HistoryPage : ContentPage
     private bool _updating;
     private bool _loading;
 
+    /// <summary>Ultimos miembros de cada grupo (en memoria): sin conexion se sigue viendo mi recorrido local.</summary>
+    private static readonly Dictionary<Guid, IReadOnlyList<Member>> s_lastMembers = [];
+
     public HistoryPage()
     {
         Title = Loc.Get("MenuHistory");
@@ -177,9 +180,27 @@ public sealed class HistoryPage : ContentPage
         if (_selector.Selected is not { } group)
             return;
 
-        var (ok, members) = await Ui.RunAsync(this, () => _family.GetMembersAsync(group.Id));
-        if (!ok || members is null)
-            return;
+        IReadOnlyList<Member>? members;
+        if (s_lastMembers.TryGetValue(group.Id, out var cached))
+        {
+            try
+            {
+                members = await _family.GetMembersAsync(group.Id);
+            }
+            catch (FamilyTogetherException ex) when (ex.IsNetwork || ex.Code == FamilyTogetherException.Server)
+            {
+                members = cached;
+            }
+        }
+        else
+        {
+            var (ok, loaded) = await Ui.RunAsync(this, () => _family.GetMembersAsync(group.Id));
+            if (!ok || loaded is null)
+                return;
+            members = loaded;
+        }
+
+        s_lastMembers[group.Id] = members;
 
         var previous = _member.SelectedIndex >= 0 && _member.SelectedIndex < _members.Count ? _members[_member.SelectedIndex].UserId : Guid.Empty;
         _members = [.. members.OrderByDescending(m => m.IsMe).ThenBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)];
@@ -215,10 +236,28 @@ public sealed class HistoryPage : ContentPage
             _snapCancel?.Cancel();
             _snapStatus.IsVisible = false;
 
-            var (ok, points) = await Ui.RunAsync(this, () => _family.GetHistoryAsync(group.Id, member.UserId, from, to));
+            // Mi recorrido sin conexion: lo del movil, sin dialogo y con una linea que lo dice.
+            var offline = false;
+            bool ok;
+            IReadOnlyList<MemberPosition>? points;
+            if (member.IsMe)
+            {
+                try
+                {
+                    points = await _family.GetHistoryAsync(group.Id, member.UserId, from, to);
+                    ok = true;
+                }
+                catch (FamilyTogetherException ex) when (ex.IsNetwork || ex.Code == FamilyTogetherException.Server)
+                {
+                    (ok, points, offline) = (false, null, true);
+                }
+            }
+            else
+            {
+                (ok, points) = await Ui.RunAsync(this, () => _family.GetHistoryAsync(group.Id, member.UserId, from, to));
+            }
 
-            // Mi recorrido: tambien lo guardado en el movil. Si el servidor falla, se pinta solo eso
-            // (el aviso del error ya ha salido).
+            // Mi recorrido: tambien lo guardado en el movil (las ultimas 24 h).
             IReadOnlyList<MemberPosition> local = [];
             if (member.IsMe)
             {
@@ -234,7 +273,7 @@ public sealed class HistoryPage : ContentPage
 
             if ((!ok || points is null) && local.Count == 0)
             {
-                _summary.Text = string.Empty;
+                _summary.Text = offline ? Loc.Get("Err_network") : string.Empty;
                 return;
             }
 
@@ -252,6 +291,8 @@ public sealed class HistoryPage : ContentPage
             var first = Clock(ordered[0].At);
             var last = Clock(ordered[^1].At);
             _summary.Text = Loc.Format("TrackSummary", ordered.Count, first, last);
+            if (offline)
+                _summary.Text += Environment.NewLine + Loc.Get("HistoryOfflineLocal");
 
             // Sin saltos de ida y vuelta imposibles ni marañas de las paradas (solo el dibujo).
             // Las paradas largas (10 min o mas en ~150 m) se pintan como un punto, no como lineas.

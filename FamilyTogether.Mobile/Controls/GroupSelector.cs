@@ -16,6 +16,12 @@ public sealed class GroupSelector : ContentView
     private IReadOnlyList<Group> _groups = [];
     private bool _updating;
 
+    /// <summary>
+    /// Ultima lista que dio el servidor (solo en memoria, mientras viva el proceso): sin conexion,
+    /// el Historial puede seguir pintando mi recorrido guardado en el movil.
+    /// </summary>
+    private static IReadOnlyList<Group>? s_lastGroups;
+
     public GroupSelector()
     {
         _picker.Title = Loc.Get("ChooseGroup");
@@ -39,9 +45,29 @@ public sealed class GroupSelector : ContentView
     /// <summary>Carga los grupos. Devuelve el elegido, o null si no hay ninguno con clave.</summary>
     public async Task<Group?> LoadAsync(Page page)
     {
-        var (ok, groups) = await Ui.RunAsync(page, () => ServiceHelper.Get<FamilyService>().GetGroupsAsync());
-        if (!ok || groups is null)
-            return Selected;
+        IReadOnlyList<Group>? groups;
+        if (s_lastGroups is { } cached)
+        {
+            // Ya se cargaron alguna vez: sin conexion se usa esa lista, sin dialogo.
+            try
+            {
+                groups = await ServiceHelper.Get<FamilyService>().GetGroupsAsync();
+            }
+            catch (FamilyTogetherException ex) when (ex.IsNetwork || ex.Code == FamilyTogetherException.Server)
+            {
+                CrashLog.Info($"grupos: sin servidor ({ex.Code}); se usa la ultima lista");
+                groups = cached;
+            }
+        }
+        else
+        {
+            var (ok, loaded) = await Ui.RunAsync(page, () => ServiceHelper.Get<FamilyService>().GetGroupsAsync());
+            if (!ok || loaded is null)
+                return Selected;
+            groups = loaded;
+        }
+
+        s_lastGroups = groups;
 
         _updating = true;
         try
