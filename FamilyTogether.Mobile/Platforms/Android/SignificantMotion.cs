@@ -26,6 +26,9 @@ internal sealed class SignificantMotion : TriggerEventListener
     /// <summary>Último disparo del sensor.</summary>
     public DateTimeOffset? LastMotion { get; private set; }
 
+    /// <summary>Salta con cada disparo (llega en el hilo del sensor: el trabajo, fuera).</summary>
+    public event Action<DateTimeOffset>? Moved;
+
     public void Start(Context context)
     {
         try
@@ -76,6 +79,15 @@ internal sealed class SignificantMotion : TriggerEventListener
         // De un solo disparo: hay que volver a armarlo.
         if (!Arm())
             Available = false;
+
+        try
+        {
+            Moved?.Invoke(now);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("Error al avisar del movimiento significativo.", ex);
+        }
     }
 
     private bool Arm()

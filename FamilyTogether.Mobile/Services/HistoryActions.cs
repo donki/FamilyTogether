@@ -23,6 +23,9 @@ public static class HistoryActions
         if (!ok)
             return false;
 
+        // Y la copia local de mi recorrido de las ultimas 24 h.
+        await Ui.RunAsync(page, () => ServiceHelper.Get<LocalTrack>().ClearAsync());
+
         await Ui.AlertAsync(page, "ClearHistory", Loc.Format("ClearHistoryDone", deleted));
         return true;
     }

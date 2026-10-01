@@ -79,6 +79,7 @@ public class LocationSharingForegroundService : Service, ILocationListener
     private bool _sentInThisRun;
     private DateTimeOffset _lastKeyShares = DateTimeOffset.MinValue;
     private readonly SignificantMotion _motion = new();
+    private readonly MotionStartBuffer _stillReadings = new();
     private DateTimeOffset _lastStillLog = DateTimeOffset.MinValue;
 
     // ==================================================================================
@@ -251,7 +252,11 @@ public class LocationSharingForegroundService : Service, ILocationListener
             if (!_listening)
                 NativeLog.Warn("Ni GPS ni red disponibles en este dispositivo.");
             else
+            {
+                _motion.Moved -= OnMoved;
+                _motion.Moved += OnMoved;
                 _motion.Start(this);
+            }
         }
         catch (Java.Lang.SecurityException ex)
         {
@@ -271,7 +276,9 @@ public class LocationSharingForegroundService : Service, ILocationListener
         if (!_listening)
             return;
 
+        _motion.Moved -= OnMoved;
         _motion.Stop();
+        _stillReadings.Clear();
         try
         {
             _locationManager?.RemoveUpdates(this);
@@ -353,8 +360,15 @@ public class LocationSharingForegroundService : Service, ILocationListener
                 if (kind == ReadingKind.Discard)
                     return;
 
+                // GPS bueno con el móvil quieto: se guarda por si es el arranque de un recorrido
+                // (el sensor de movimiento llega tarde; MotionStartBuffer). Los demás, ni caso.
+                if (kind == ReadingKind.Coarse)
+                    _stillReadings.Hold(location.Provider, new TrackPoint(location.Latitude, location.Longitude, location.Accuracy,
+                        DateTimeOffset.FromUnixTimeMilliseconds(location.Time)));
+
                 LastFix = location;
-                await HandleReadingAsync(location, kind == ReadingKind.Coarse).ConfigureAwait(false);
+                await HandleReadingAsync(location.Latitude, location.Longitude, location.Accuracy,
+                    DateTimeOffset.FromUnixTimeMilliseconds(location.Time), kind == ReadingKind.Coarse).ConfigureAwait(false);
             }
             finally
             {
@@ -368,7 +382,58 @@ public class LocationSharingForegroundService : Service, ILocationListener
         }
     }
 
-    private async Task HandleReadingAsync(AndroidLocation location, bool coarse)
+    /// <summary>
+    /// El sensor ha saltado: las lecturas GPS buenas tomadas «por quieto» en los minutos de antes
+    /// eran el principio del recorrido y entran en el historial con su hora (MotionStartBuffer).
+    /// </summary>
+    private void OnMoved(DateTimeOffset at) => _ = Task.Run(() => PromoteStillReadingsAsync(at));
+
+    private async Task PromoteStillReadingsAsync(DateTimeOffset motionAt)
+    {
+        try
+        {
+            if (!_running)
+                return;
+
+            await _work.WaitAsync().ConfigureAwait(false);
+            AcquireWakeLock();
+            try
+            {
+                var held = _stillReadings.Release(motionAt);
+                if (held.Count == 0)
+                    return;
+
+                var promoted = 0;
+                foreach (var p in held)
+                {
+                    // La misma regla de los 25 m que una lectura buena normal.
+                    if (SharingState.LastSent is { } last)
+                    {
+                        var results = new float[1];
+                        AndroidLocation.DistanceBetween(last.Lat, last.Lon, p.Lat, p.Lon, results);
+                        if (results[0] < ThresholdMeters)
+                            continue;
+                    }
+
+                    await HandleReadingAsync(p.Lat, p.Lon, p.Accuracy, p.At, coarse: false).ConfigureAwait(false);
+                    promoted++;
+                }
+
+                NativeLog.Info($"Al echar a andar: {promoted} de {held.Count} lecturas de antes del sensor entran en el historial.");
+            }
+            finally
+            {
+                ReleaseWakeLock();
+                _work.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Error("Error al recuperar el principio del recorrido.", ex);
+        }
+    }
+
+    private async Task HandleReadingAsync(double lat, double lon, double accuracy, DateTimeOffset at, bool coarse)
     {
         var family = PlatformServiceLocator.Get<FamilyService>();
         var outbox = PlatformServiceLocator.Get<LocationOutbox>();
@@ -378,10 +443,6 @@ public class LocationSharingForegroundService : Service, ILocationListener
             return;
         }
 
-        var lat = location.Latitude;
-        var lon = location.Longitude;
-        double accuracy = location.Accuracy;
-        var at = DateTimeOffset.FromUnixTimeMilliseconds(location.Time);
         var online = IsOnline();
 
         // Los grupos se fijan AHORA y viajan con la fila: si luego se pausa uno, lo registrado
@@ -392,13 +453,18 @@ public class LocationSharingForegroundService : Service, ILocationListener
         {
             try
             {
-                await outbox.EnqueueAsync(lat, lon, accuracy, ReadBattery(), at, groups, coarse).ConfigureAwait(false);
+                var queued = await outbox.EnqueueAsync(lat, lon, accuracy, ReadBattery(), at, groups, coarse).ConfigureAwait(false);
                 // Una aproximada no cuenta como referencia: la siguiente buena tiene que salir.
                 if (!coarse)
                 {
                     SharingState.LastSent = (lat, lon);
                     _sentInThisRun = true;
                 }
+
+                // Mi recorrido de las últimas 24 h, también en el móvil: se pinta aunque el
+                // servidor falle o la cola no se haya vaciado.
+                if (queued && !coarse && PlatformServiceLocator.Get<LocalTrack>() is { } track)
+                    await track.AddAsync(lat, lon, accuracy, at, groups).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -529,6 +595,17 @@ public class LocationSharingForegroundService : Service, ILocationListener
 
     private async Task CycleAsync()
     {
+        // Lo de más de 24 h del recorrido local se borra también sin red.
+        try
+        {
+            if (PlatformServiceLocator.Get<LocalTrack>() is { } track)
+                await track.PruneAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo podar el recorrido local.", ex);
+        }
+
         if (!IsOnline())
             return;
 

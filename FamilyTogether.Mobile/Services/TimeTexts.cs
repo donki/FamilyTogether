@@ -30,6 +30,22 @@ public static class TimeTexts
         return local.ToString("g", Loc.Culture);
     }
 
+    /// <summary>
+    /// Una hora pasada del historial: «18:30» si es de hoy, «ayer 18:30» si es de ayer, y si no la
+    /// fecha corta con la hora (las «Ultimas 24 horas» cruzan la medianoche).
+    /// </summary>
+    public static string Clock(DateTimeOffset at)
+    {
+        var local = at.ToLocalTime();
+        var today = DateTime.Today;
+        var time = local.ToString("HH:mm", Loc.Culture);
+        if (local.Date == today)
+            return time;
+        if (local.Date == today.AddDays(-1))
+            return Loc.Format("YesterdayAt", time);
+        return local.ToString("g", Loc.Culture);
+    }
+
     /// <summary>«En pausa» o «En pausa (hasta 18:30)».</summary>
     public static string Paused(DateTimeOffset? until) =>
         until is { } u ? Loc.Format("PausedUntil", Until(u)) : Loc.Get("PausedIndefinite");

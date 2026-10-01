@@ -329,6 +329,22 @@ public sealed class FamilyService
         Guid group, Guid user, DateOnly day, TimeZoneInfo tz, CancellationToken cancellationToken = default)
     {
         var (from, to) = DayRange(day, tz);
+        var points = await GetHistoryAsync(group, user, from, to, cancellationToken).ConfigureAwait(false);
+        return [.. points.Where(p => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(p.At, tz).DateTime) == day)];
+    }
+
+    /// <summary>
+    /// Recorrido de un miembro entre <paramref name="from"/> (incluida) y <paramref name="to"/>
+    /// (excluida), de la posicion mas antigua a la mas nueva; cruza la medianoche sin mas (las
+    /// «Ultimas 24 horas», <see cref="RecentRange"/>). Solo las buenas (<c>coarse</c> falso): las
+    /// aproximadas no dibujan recorrido. Pagina de 1000 en 1000.
+    /// </summary>
+    public async Task<IReadOnlyList<MemberPosition>> GetHistoryAsync(
+        Guid group, Guid user, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
+    {
+        if (to <= from)
+            return [];
+
         var key = await _keys.GetAsync(group).ConfigureAwait(false);
 
         const int page = 1000;   // el max-rows por defecto de Supabase
@@ -342,7 +358,7 @@ public sealed class FamilyService
                 cancellationToken).ConfigureAwait(false);
 
             result.AddRange(rows
-                .Where(r => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(r.RecordedAt, tz).DateTime) == day)
+                .Where(r => r.RecordedAt >= from && r.RecordedAt < to)
                 .Select(r => ToPosition(r, key))
                 .OfType<MemberPosition>());
 
@@ -350,8 +366,22 @@ public sealed class FamilyService
                 break;
         }
 
-        return result;
+        return [.. result.OrderBy(p => p.At)];
     }
+
+    /// <summary>Lo que abarca «Ultimas 24 horas».</summary>
+    public static readonly TimeSpan RecentWindow = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// Tramo de «Ultimas 24 horas»: desde <paramref name="now"/> menos 24 h hasta un poco despues
+    /// de ahora (<see cref="ClockSlack"/>: el reloj de otro movil puede ir algo adelantado y su
+    /// ultima posicion no debe quedarse fuera).
+    /// </summary>
+    public static (DateTimeOffset From, DateTimeOffset To) RecentRange(DateTimeOffset now) =>
+        (now - RecentWindow, now + ClockSlack);
+
+    /// <summary>Margen por relojes adelantados en <see cref="RecentRange"/>.</summary>
+    public static readonly TimeSpan ClockSlack = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Borra mi historial de posiciones en todos mis grupos (RPC <c>clear_my_history</c>). Se
@@ -363,7 +393,7 @@ public sealed class FamilyService
         await _client.RpcAsync<int>("clear_my_history", new { }, cancellationToken).ConfigureAwait(false);
 
     /// <summary>Inicio y fin (UTC) del dia <paramref name="day"/> en <paramref name="tz"/>.</summary>
-    internal static (DateTimeOffset From, DateTimeOffset To) DayRange(DateOnly day, TimeZoneInfo tz) =>
+    public static (DateTimeOffset From, DateTimeOffset To) DayRange(DateOnly day, TimeZoneInfo tz) =>
         (LocalMidnightUtc(day, tz), LocalMidnightUtc(day.AddDays(1), tz));
 
     private static DateTimeOffset LocalMidnightUtc(DateOnly day, TimeZoneInfo tz)

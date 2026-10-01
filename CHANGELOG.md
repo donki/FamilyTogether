@@ -1,5 +1,26 @@
 # Changelog — Family Together
 
+## 2026.10.01.00
+
+- **Historial: «Últimas 24 horas»**, la vista al abrir: de ahora menos 24 h a ahora, cruzando la
+  medianoche, con la misma limpieza, paradas como un punto y ajuste a calles que un día. «Un día»
+  enseña el selector de fecha (corta) para los 30 días de retención. Horas del resumen y de las
+  paradas como «ayer 23:40» cuando no son de hoy. `FamilyService.GetHistoryAsync(group, user, from,
+  to)` y `RecentRange` (+5 min por relojes adelantados).
+- **Mi recorrido de las últimas 24 h también en el móvil** (`LocalTrack`, tabla `local_track` del
+  SQLite privado de la app, como la cola; no sale del móvil): cada lectura buena que la cola acepta
+  se guarda con sus grupos y se junta con lo del servidor al pintar mi historial, así que se ve
+  aunque el servidor falle o la cola no se haya enviado. Se poda a las 24 h (al guardar, al
+  consultar y cada 60 s, también sin red) y se borra con «Borrar mi historial». Lo del servidor
+  sigue cifrado con la clave del grupo y con 30 días de retención.
+- **Al echar a andar** (`MotionStartBuffer`): el sensor de movimiento significativo avisa tarde y
+  las lecturas GPS buenas de antes se tomaban por quieto, así que el recorrido empezaba unas calles
+  después. Ahora se guardan en memoria y, al saltar el sensor, las de los 5 min anteriores entran
+  en el historial con su hora.
+- Revisado: la cola sin conexión conserva las posiciones con su hora y las envía cifradas al
+  volver la red; una aproximada no mueve la referencia de los 25 m (no corta la ruta).
+- Pruebas: 265 (antes 250), cobertura de lo instrumentado 99 %, de toda la app 33 %.
+
 ## 2026.09.29.01
 
 - **Fechas en formato corto** (27/09/2026, o el corto del idioma del móvil) en el día de Historial y en Novedades; antes salía «domingo, 27 de septiembre de 2026».

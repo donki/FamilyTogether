@@ -1,5 +1,19 @@
 [
   {
+    "version": "2026.10.01.00",
+    "date": "2026-10-01",
+    "es": [
+      "El Historial abre en «Últimas 24 horas»: tu recorrido o el de otra persona desde ayer a esta hora hasta ahora, aunque cruce la medianoche. Para ver un día anterior, elige «Un día».",
+      "Tu propio recorrido de las últimas 24 horas se guarda también en tu móvil: lo ves aunque no haya conexión con el servidor. Se borra solo pasado un día.",
+      "Al salir de casa, el recorrido empieza donde empezó, no unas calles después."
+    ],
+    "en": [
+      "History opens on \"Last 24 hours\": your route or someone else's from this time yesterday until now, even across midnight. To see an earlier day, choose \"One day\".",
+      "Your own route for the last 24 hours is also kept on your phone, so you can see it even without a connection to the server. It is deleted automatically after a day.",
+      "When you leave home, the route starts where it really started, not a few streets later."
+    ]
+  },
+  {
     "version": "2026.09.29.01",
     "date": "2026-09-29",
     "es": [

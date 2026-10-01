@@ -23,7 +23,7 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   administradores. Aprobada → miembro, ve el mapa. Rechazada → aviso, sin acceso.
 - **HU3 — Última posición (P1).** Desplazamiento ≥ 25 m en primer o segundo plano → aparece en el
   mapa de los demás, con hora y batería. En pausa → «En pausa» (con hora de fin si la tiene), sin posición.
-- **HU4 — Historial (P2).** Día dentro de la retención → trayecto en el mapa. Más antiguo → ya no existe.
+- **HU4 — Historial (P2).** Al abrir, las **últimas 24 horas** (cruzan la medianoche) → trayecto en el mapa. Día dentro de la retención → su trayecto. Más antiguo → ya no existe.
 - **HU5 — Zonas y alertas (P2).** Cualquier miembro crea zonas (centro y radio) visibles para todo el
   grupo. Aviso de entrada/salida solo para las combinaciones persona + zona activadas.
 - **HU6 — SOS (P1).** Cuenta atrás de 3 s con Cancelar; si no se cancela, se envía. Por defecto a todos
@@ -51,7 +51,7 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
 | FR-011 | Enviar la batería con cada posición. |
 | FR-012 | Mapa: última posición, hora, batería o «En pausa» por miembro. |
 | FR-013 | Historial con borrado automático al superar la retención. |
-| FR-014 | Ver el recorrido de cualquier miembro en un día dentro de la retención. |
+| FR-014 | Ver el recorrido de cualquier miembro en las últimas 24 horas (por defecto) o en un día dentro de la retención. |
 | FR-015 | Cualquier miembro crea, edita y borra zonas visibles para todo el grupo. |
 | FR-016 | Avisos de entrada y salida por persona + zona; solo los activados. |
 | FR-017 | Pausar por grupo, con duración o indefinida, y reanudar. |
@@ -130,6 +130,14 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
   aproximadas) y el GPS solo si el móvil se mueve, según el sensor de movimiento significativo
   (sin Google Play Services; si no lo hay, como antes) o la velocidad del GPS. En el dibujo, una
   parada de 10 min o más en unos 150 m es un punto.
+- **Últimas 24 horas (2026-10-01)**: el Historial abre en «Últimas 24 horas» (de ahora menos 24 h a
+  ahora, cruzando la medianoche, con la misma limpieza, paradas y ajuste a calles que un día); «Un
+  día» enseña el selector de fecha (corta) para los 30 días de retención. **Mi recorrido** de las
+  últimas 24 h se guarda también en el móvil (SQLite privado de la app, como la cola; nunca sale de
+  él) y se junta con el del servidor: se ve aunque el servidor falle o la cola no se haya enviado;
+  caduca solo a las 24 h y se borra con «Borrar mi historial». **Al echar a andar**, las lecturas
+  GPS buenas de los 5 min anteriores al aviso del sensor de movimiento (que llega tarde) entran en
+  el historial con su hora: el recorrido empieza donde empezó, no unas calles después.
 - **Traza limpia al dibujar (2026-09-27)**: se quitan los saltos de ida y vuelta imposibles (más de
   50 km/h en un salto que vuelve) y las paradas se juntan en un punto; el ajuste a calles tiene
   tiempo máximo y, si no llega, se queda recto con aviso.

@@ -7,10 +7,13 @@ using FamilyTogether.Mobile.Services;
 namespace FamilyTogether.Mobile.Pages;
 
 /// <summary>
-/// Historial (HU4, FR-014): el recorrido de un miembro en un dia de los ultimos 30 (la retencion),
-/// como una linea en el mapa con su inicio y su fin.
+/// Historial (HU4, FR-014): el recorrido de un miembro en las <b>ultimas 24 horas</b> (lo que se
+/// ve al abrir; cruza la medianoche) o en un dia de los ultimos 30 (la retencion), como una linea en
+/// el mapa con su inicio y su fin.
 /// </summary>
 /// <remarks>
+/// <para><b>Mi recorrido</b> se junta con la copia local de las ultimas 24 h
+/// (<see cref="LocalTrack"/>): se ve aunque el servidor falle o la cola aun no se haya enviado.</para>
 /// <para><b>Por las calles.</b> Primero se dibuja recto, al momento; si el ajuste esta encendido
 /// (Ajustes, por defecto si), se pide la red de calles de las teselas que toca el recorrido
 /// (<see cref="TrackSnapper"/>: a Overpass solo van rectangulos fijos, nunca el recorrido), se
@@ -33,7 +36,10 @@ public sealed class HistoryPage : ContentPage
     private static readonly TimeSpan SnapLimit = TimeSpan.FromSeconds(75);
     private readonly GroupSelector _selector = new();
     private readonly Picker _member = new();
+    private readonly Picker _period = new();
     private readonly DatePicker _day = new() { Format = "d" };   // fecha corta (27/09/2026)
+    private readonly Border _dayBox;
+    private readonly LocalTrack _localTrack = ServiceHelper.Get<LocalTrack>();
     private readonly MapView _map = new();
     private readonly Label _summary = new();
     private IReadOnlyList<Member> _members = [];
@@ -67,6 +73,18 @@ public sealed class HistoryPage : ContentPage
         _member.SelectedIndexChanged += async (_, _) => { if (!_updating) await LoadTrackAsync(); };
         _day.DateSelected += async (_, _) => await LoadTrackAsync();
 
+        // Ultimas 24 horas (por defecto) o un dia concreto.
+        _period.Title = Loc.Get("HistoryPeriod");
+        _period.ItemsSource = new List<string> { Loc.Get("HistoryLast24h"), Loc.Get("HistoryOneDay") };
+        _period.SelectedIndex = 0;
+        _dayBox = UiKit.Input(_day);
+        _dayBox.IsVisible = false;
+        _period.SelectedIndexChanged += async (_, _) =>
+        {
+            _dayBox.IsVisible = !Last24h;
+            await LoadTrackAsync();
+        };
+
         var legend = new HorizontalStackLayout
         {
             Spacing = 16,
@@ -92,8 +110,9 @@ public sealed class HistoryPage : ContentPage
                 }.Also(g =>
                 {
                     g.Add(UiKit.Input(_member), 0, 0);
-                    g.Add(UiKit.Input(_day), 1, 0);
+                    g.Add(UiKit.Input(_period), 1, 0);
                 }),
+                _dayBox,
             },
         };
 
@@ -117,6 +136,8 @@ public sealed class HistoryPage : ContentPage
         root.Add(bottom, 0, 2);
         Content = root;
     }
+
+    private bool Last24h => _period.SelectedIndex != 1;
 
     private static View Dot(string color, string text) => new HorizontalStackLayout
     {
@@ -187,28 +208,49 @@ public sealed class HistoryPage : ContentPage
         try
         {
             var member = _members[_member.SelectedIndex];
+            var last24h = Last24h;
             var day = DateOnly.FromDateTime(_day.Date ?? DateTime.Today);
+            var (from, to) = last24h ? FamilyService.RecentRange(DateTimeOffset.UtcNow) : FamilyService.DayRange(day, TimeZoneInfo.Local);
             _summary.Text = Loc.Get("Loading");
             _snapCancel?.Cancel();
             _snapStatus.IsVisible = false;
 
-            var (ok, points) = await Ui.RunAsync(this, () => _family.GetHistoryAsync(group.Id, member.UserId, day, TimeZoneInfo.Local));
-            if (!ok || points is null)
+            var (ok, points) = await Ui.RunAsync(this, () => _family.GetHistoryAsync(group.Id, member.UserId, from, to));
+
+            // Mi recorrido: tambien lo guardado en el movil. Si el servidor falla, se pinta solo eso
+            // (el aviso del error ya ha salido).
+            IReadOnlyList<MemberPosition> local = [];
+            if (member.IsMe)
+            {
+                try
+                {
+                    local = await _localTrack.GetAsync(member.UserId, group.Id, from, to);
+                }
+                catch (Exception ex)
+                {
+                    CrashLog.Error("HistoryPage.LocalTrack", ex);
+                }
+            }
+
+            if ((!ok || points is null) && local.Count == 0)
             {
                 _summary.Text = string.Empty;
                 return;
             }
 
-            var ordered = points.OrderBy(p => p.At).ToList();
+            var ordered = LocalTrack.Merge(points ?? [], local).ToList();
             if (ordered.Count == 0)
             {
-                _summary.Text = Loc.Get("NoPositionsThatDay");
+                _summary.Text = Loc.Get(last24h ? "NoPositionsLast24h" : "NoPositionsThatDay");
+                _stops = [];
                 await _map.RunAsync("clearTrack()");
                 return;
             }
 
-            var first = ordered[0].At.ToLocalTime().ToString("HH:mm", Loc.Culture);
-            var last = ordered[^1].At.ToLocalTime().ToString("HH:mm", Loc.Culture);
+            // En un dia, solo la hora; en las ultimas 24 h, «ayer 18:30» si cruza la medianoche.
+            string Clock(DateTimeOffset at) => last24h ? TimeTexts.Clock(at) : at.ToLocalTime().ToString("HH:mm", Loc.Culture);
+            var first = Clock(ordered[0].At);
+            var last = Clock(ordered[^1].At);
             _summary.Text = Loc.Format("TrackSummary", ordered.Count, first, last);
 
             // Sin saltos de ida y vuelta imposibles ni marañas de las paradas (solo el dibujo).
@@ -218,9 +260,9 @@ public sealed class HistoryPage : ContentPage
             _stops = [.. cleaned.Stops.Select(s => new object[]
             {
                 s.Center.Lat, s.Center.Lon,
-                Loc.Format("StopLabel", s.From.ToLocalTime().ToString("HH:mm", Loc.Culture), s.To.ToLocalTime().ToString("HH:mm", Loc.Culture)),
+                Loc.Format("StopLabel", Clock(s.From), Clock(s.To)),
             })];
-            CrashLog.Info($"historial: {ordered.Count} posiciones, {clean.Count} tras limpiar, {cleaned.Stops.Count} paradas");
+            CrashLog.Info($"historial{(last24h ? " 24 h" : "")}: {ordered.Count} posiciones ({local.Count} del movil), {clean.Count} tras limpiar, {cleaned.Stops.Count} paradas");
             var coords = clean.Select(p => new[] { p.Lat, p.Lon }).ToList();
             await _map.RunAsync($"setTrack({MapView.Json(coords)}, '{StartColor}', '{EndColor}')");
             await _map.RunAsync($"addStops({MapView.Json(_stops)})");

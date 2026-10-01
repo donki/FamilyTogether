@@ -240,6 +240,25 @@ public partial class MobileTextsTests : IDisposable
         Assert.Equal("batería 42 %", TimeTexts.Battery(42));
     }
 
+    [Fact]
+    public void HoraDelHistorialHoyAyerOFecha()
+    {
+        Loc.SetPreference(Loc.Spanish);
+        var today = new DateTimeOffset(DateTime.Today.AddHours(9).AddMinutes(5));
+        var yesterday = new DateTimeOffset(DateTime.Today.AddDays(-1).AddHours(23).AddMinutes(40));
+        var before = new DateTimeOffset(DateTime.Today.AddDays(-3).AddHours(7));
+
+        Assert.Equal("09:05", TimeTexts.Clock(today));
+        Assert.Equal("ayer 23:40", TimeTexts.Clock(yesterday));
+        Assert.Equal(before.ToString("g", CultureInfo.GetCultureInfo("es-ES")), TimeTexts.Clock(before));
+
+        Loc.SetPreference(Loc.English);
+        Assert.Equal("yesterday 23:40", TimeTexts.Clock(yesterday));
+        Assert.Equal("Last 24 hours", Loc.Get("HistoryLast24h"));
+        Loc.SetPreference(Loc.Spanish);
+        Assert.Equal("Últimas 24 horas", Loc.Get("HistoryLast24h"));
+    }
+
     // -----------------------------------------------------------------------
     // Avisos
     // -----------------------------------------------------------------------

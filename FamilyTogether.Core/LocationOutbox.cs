@@ -101,12 +101,13 @@ public sealed class LocationOutbox
     /// </summary>
     /// <param name="coarse">Aproximada aunque la precision diga otra cosa (lectura de red, o del
     /// GPS con el movil quieto: <see cref="ReadingPolicy"/>). Sin valor, la decide la precision.</param>
-    public async Task EnqueueAsync(
+    /// <returns>Si se encolo (para guardarla tambien en <see cref="LocalTrack"/>).</returns>
+    public async Task<bool> EnqueueAsync(
         double lat, double lon, double accuracy, int battery, DateTimeOffset at,
         IReadOnlyList<Guid> sharingGroups, bool? coarse = null, CancellationToken cancellationToken = default)
     {
         if (sharingGroups.Count == 0 || accuracy > CoarseMaxAccuracyMeters || double.IsNaN(lat) || double.IsNaN(lon))
-            return;
+            return false;
 
         await InitAsync().ConfigureAwait(false);
 
@@ -120,12 +121,12 @@ public sealed class LocationOutbox
             // veria nunca. No entra en el historial ni en las zonas.
             if (last is not null && last.Groups == groups &&
                 (at.UtcTicks - last.FineAtUtcTicks < CoarseAfter.Ticks || at.UtcTicks - last.CoarseAtUtcTicks < CoarseAfter.Ticks))
-                return;
+                return false;
         }
         else if (last is not null && last.Groups == groups && last.FineAtUtcTicks > 0 &&
                  Geo.DistanceMeters(last.Lat, last.Lon, lat, lon) < MinDistanceMeters)
         {
-            return;
+            return false;
         }
 
         await _db.InsertAsync(new OutboxRow
@@ -154,6 +155,7 @@ public sealed class LocationOutbox
             next.FineAtUtcTicks = at.UtcTicks;
         }
         await _db.InsertOrReplaceAsync(next).ConfigureAwait(false);
+        return true;
     }
 
     /// <summary>

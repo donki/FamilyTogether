@@ -41,12 +41,12 @@ dotnet test FamilyTogether.Core.Tests
 
 ## Pruebas
 
-250 pruebas (xUnit), todas pasan; el banco tarda unos 5 s (sin contar la compilación). Medido el
-2026-09-30:
+265 pruebas (xUnit), todas pasan; el banco tarda unos 6 s (sin contar la compilación). Medido el
+2026-10-01:
 
 - **Cobertura de lo instrumentado: 99 %** de las líneas (`FamilyTogether.Core` más los ficheros de
   la app enlazados a las pruebas: textos es/en, `Loc`, horas y textos de los avisos).
-- **Cobertura sobre toda la app: 33 %** (3129 de ~9580 líneas de C# de Core y Mobile). Lo que queda
+- **Cobertura sobre toda la app: 33 %** (3243 de ~9830 líneas de C# de Core y Mobile). Lo que queda
   es la interfaz MAUI y los servicios de Android (ubicación, FCM, avisos), que no se prueban aquí.
 
 El servidor es falso (`FakeSupabase`): ninguna prueba sale a la red. Las de integración contra el

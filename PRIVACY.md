@@ -33,6 +33,9 @@ cada una. Para eso tiene que compartir tu ubicación con tu grupo, y lo hace as�
 - **Puedes borrar tu historial cuando quieras** (Ajustes o Historial): se borran tus posiciones en
   todos tus grupos, también las que el móvil aún no había enviado. Se conserva solo tu última
   posición en cada grupo, para que el mapa te siga viendo. Nadie puede borrar el historial de otro.
+- **Tu propio recorrido de las últimas 24 horas se guarda también en tu móvil**, en la carpeta
+  privada de la app (no sale del móvil ni va en copias de seguridad), para que el Historial lo
+  enseñe aunque no haya conexión. Se borra solo pasado un día, y también al borrar tu historial.
 
 ## Con quién se comparten
 
@@ -102,6 +105,9 @@ do that it has to share your location with your group, and it does so like this:
 - **You can delete your history whenever you like** (Settings or History): your positions are deleted
   in all your groups, including those the phone had not sent yet. Only your last position in each
   group is kept, so the map still shows you. Nobody can delete someone else's history.
+- **Your own route for the last 24 hours is also kept on your phone**, in the app's private folder
+  (it never leaves the phone and is not included in backups), so History can show it without a
+  connection. It is deleted automatically after a day, and also when you delete your history.
 
 ## Who it is shared with
 

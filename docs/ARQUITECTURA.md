@@ -202,6 +202,17 @@ ubicación consulta cada 60 s los eventos nuevos (SOS, zonas, solicitudes) y avi
   lo vigila el concentrador de sensores del chip y solo despierta a la app al detectar que el
   usuario cambia de sitio; se vuelve a armar tras cada disparo. Android lo exige de bajo consumo
   (décimas de mA; el log de arranque escribe su nombre y su consumo declarado).
+- **Al echar a andar (2026-10-01, `MotionStartBuffer`)**: el sensor salta con retraso (segundos o
+  un par de minutos, según el fabricante) y el GPS bueno de antes se tomaba por quieto: el
+  recorrido empezaba unas calles después. Las lecturas GPS de 25 m o mejor clasificadas como
+  quietas se guardan en memoria (10 como mucho, 5 min); al saltar el sensor, las de los 5 min
+  anteriores entran como buenas con su hora (con la regla de los 25 m desde la última enviada).
+- **Mi recorrido de las últimas 24 h en el móvil (2026-10-01, `LocalTrack`)**: cada lectura buena
+  que la cola acepta (`EnqueueAsync` devuelve si encoló) se guarda también en la tabla
+  `local_track` del mismo SQLite privado (coordenadas en claro, como la cola: no sale del móvil ni
+  va en copias), con los grupos donde compartía. Se poda a las 24 h al guardar, al consultar y en
+  cada ciclo de 60 s (también sin red). Se borra entera con «Borrar mi historial». Las aproximadas
+  no se guardan ni cortan nada: no mueven la referencia de los 25 m.
 - Cada lectura válida va a la **cola local** (SQLite) con la hora original y **la lista de grupos
   que comparten en ese momento** (así la pausa se cumple aunque se envíe más tarde). Al enviar se
   cifra una fila por grupo con la clave de cada uno.
@@ -265,6 +276,8 @@ public sealed class FamilyService       // lo que llama la interfaz
     Task<IReadOnlyList<Member>> GetMembersAsync(Guid group);
     Task<IReadOnlyList<MemberPosition>> GetLastPositionsAsync(Guid group);
     Task<IReadOnlyList<MemberPosition>> GetHistoryAsync(Guid group, Guid user, DateOnly day, TimeZoneInfo tz);
+    Task<IReadOnlyList<MemberPosition>> GetHistoryAsync(Guid group, Guid user, DateTimeOffset from, DateTimeOffset to); // [from, to), ordenado
+    static (DateTimeOffset From, DateTimeOffset To) RecentRange(DateTimeOffset now);   // últimas 24 h (+5 min por relojes)
     Task SetRoleAsync(Guid group, Guid user, bool admin); Task RemoveMemberAsync(Guid group, Guid user); Task LeaveGroupAsync(Guid group);
     Task SetPauseAsync(Guid group, bool paused, DateTimeOffset? until);
     Task UpdateMyProfileAsync(string displayName, string? avatarBase64);  // en todos mis grupos
@@ -278,10 +291,18 @@ public sealed class FamilyService       // lo que llama la interfaz
 
 public sealed class LocationOutbox      // SQLite (sqlite-net-pcl): cola de posiciones y de SOS
 {
-    Task EnqueueAsync(double lat, double lon, double accuracy, int battery, DateTimeOffset at, IReadOnlyList<Guid> sharingGroups);
+    Task<bool> EnqueueAsync(double lat, double lon, double accuracy, int battery, DateTimeOffset at, IReadOnlyList<Guid> sharingGroups, bool? coarse = null); // si encoló
     Task<int> FlushAsync(FamilyService service);     // cifra por grupo e inserta; devuelve cuántas envió
     Task<int> PendingCountAsync();
     Task<int> ClearHistoryAsync(FamilyService service); // servidor y, si sale bien, la cola menos la lectura más reciente
+}
+
+public sealed class LocalTrack          // mismo SQLite: mi recorrido de las últimas 24 h (§8)
+{
+    Task AddAsync(double lat, double lon, double accuracy, DateTimeOffset at, IReadOnlyList<Guid> groups);
+    Task<IReadOnlyList<MemberPosition>> GetAsync(Guid me, Guid group, DateTimeOffset from, DateTimeOffset to);
+    Task<int> PruneAsync(); Task ClearAsync();
+    static IReadOnlyList<MemberPosition> Merge(IReadOnlyList<MemberPosition> server, IReadOnlyList<MemberPosition> local);
 }
 
 // Historial por las calles (§10)
@@ -326,6 +347,18 @@ Los textos visibles de los avisos los monta la app con su localización a partir
 - Se conserva la última posición de cada grupo (`last_positions`): el mapa te sigue viendo, pero el
   historial queda vacío. Nadie puede borrar el de otro: la RPC no tiene parámetros y un `DELETE`
   directo sobre `positions` lo rechaza el servidor (probado en `IntegrationTests`).
+
+### Últimas 24 horas (2026-10-01)
+
+- Vista por defecto del Historial. Tramo `FamilyService.RecentRange(ahora)` = `[ahora − 24 h,
+  ahora + 5 min)` (el margen, por si el reloj de otro móvil va adelantado), pedido al servidor por
+  `recorded_at` (`gte`/`lt`, `coarse=is.false`, páginas de 1000) y filtrado otra vez en el móvil;
+  cruza la medianoche sin más. «Un día» usa el mismo método con `DayRange`.
+- Si la persona elegida soy yo, se junta con `LocalTrack.GetAsync` (`LocalTrack.Merge`: por hora,
+  sin repetir la misma lectura al segundo, gana la del servidor). Si el servidor falla, sale el
+  aviso de error y se pinta igual lo del móvil.
+- Horas del resumen y de las paradas: «18:30», «ayer 18:30» o fecha corta y hora
+  (`TimeTexts.Clock`).
 
 ### Recorridos por las calles (solo dibujo, en el móvil)
 

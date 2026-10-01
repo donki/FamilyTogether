@@ -47,6 +47,7 @@ public static class MauiProgram
             sp.GetRequiredService<SupabaseClient>(), sp.GetRequiredService<FamilyService>(),
             sp.GetRequiredService<ISecureStore>(), sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<IOAuthBrowser>()));
         builder.Services.AddSingleton(_ => new LocationOutbox(database));
+        builder.Services.AddSingleton(_ => new LocalTrack(database));   // mi recorrido de las ultimas 24 h
         builder.Services.AddSingleton(sp => new SosService(database, sp.GetRequiredService<FamilyService>()));
         builder.Services.AddSingleton(sp => new ZoneWatcher(database, sp.GetRequiredService<FamilyService>()));
         builder.Services.AddSingleton(sp => new EventFeed(database, sp.GetRequiredService<FamilyService>()));
