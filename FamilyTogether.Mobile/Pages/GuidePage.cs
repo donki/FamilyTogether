@@ -137,7 +137,7 @@ public sealed class GuidePage : ContentPage
     private void OnTick(object? sender, EventArgs e) => _ = RefreshStateAsync();
 
     // Al volver de una pantalla del sistema (permisos, bateria), el paso se vuelve a mirar al momento.
-    private void OnResumed(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(() => _ = RefreshStateAsync());
+    private void OnResumed(object? sender, EventArgs e) => UiThread.Post(() => _ = RefreshStateAsync());
 
     private List<Step> BuildSteps()
     {

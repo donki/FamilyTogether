@@ -74,7 +74,7 @@ public static class CrashLog
 
         try
         {
-            MainThread.BeginInvokeOnMainThread(async () =>
+            UiThread.Post(async () =>
             {
                 try
                 {

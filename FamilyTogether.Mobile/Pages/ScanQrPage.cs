@@ -54,15 +54,20 @@ public sealed class ScanQrPage : ContentPage
         Content = root;
     }
 
+    /// <summary>Permiso de camara: lo mira y, si falta, lo pide. Las pruebas lo sustituyen.</summary>
+    internal static Func<Task<PermissionStatus>> CameraPermission { get; set; } = async () =>
+    {
+        var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
+        return status == PermissionStatus.Granted ? status : await Permissions.RequestAsync<Permissions.Camera>();
+    };
+
     /// <summary>
     /// Abre la camara y espera. Devuelve el codigo leido, o <c>null</c> si se cerro sin leer nada o
     /// si no hay permiso de camara (se dice, y se recuerda que el codigo se puede escribir).
     /// </summary>
     public static async Task<string?> RequestAsync(Page origin)
     {
-        var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
-        if (status != PermissionStatus.Granted)
-            status = await Permissions.RequestAsync<Permissions.Camera>();
+        var status = await CameraPermission();
 
         if (status != PermissionStatus.Granted)
         {

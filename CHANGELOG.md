@@ -1,5 +1,25 @@
 # Changelog — Family Together
 
+## 2026.10.03.00
+
+- **Pruebas: 90,1 % de toda la app** (antes 33 % con la cuenta antigua; 45,9 % con la nueva, que
+  cuenta solo sentencias y no excluye `CompilerGeneratedAttribute`). 498 pruebas (antes 265). La app
+  MAUI entera se compila para `net10.0` en `FamilyTogether.Core.Tests\App` y las pantallas se prueban
+  sin pantalla; la lógica de la parte nativa (qué se hace con cada lectura de ubicación, el ciclo de
+  60 s, la caché de grupos donde comparto, el FCM, los avisos y el inicio automático de cada
+  fabricante) pasa a `Services\Native\`, y en `Platforms\Android` solo queda la llamada al sistema.
+  `tools\cobertura-app.py` cuenta «toda la app» (ver README).
+- **Arreglado**: guardar una zona con la sesión aún sin cargar cerraba la app (ahora es un aviso).
+- **Arreglado**: en Ajustes, quitar o elegir la foto o guardar el nombre con la sesión aún sin
+  cargar podía cerrar la app.
+- **Arreglado**: en el Mapa y en el Historial, elegir otro grupo, persona, día o periodo mientras se
+  cargaba se perdía (el selector enseñaba lo nuevo y el mapa seguía con lo anterior); ahora se
+  vuelve a cargar al terminar.
+- **Arreglado**: un error del servidor que no fuera de red al recargar los grupos (Mapa, Zonas,
+  Historial) salía como «error inesperado»; ahora sale su texto.
+- Servicio de ubicación: si no se puede coger la CPU, la lectura ya no deja bloqueado el resto del
+  trabajo (el cerrojo se suelta siempre). Probado en MuMu: el servicio arranca y recibe la posición.
+
 ## 2026.10.01.01
 
 - **Historial sin conexión**: probado en MuMu sin red, la 2026.10.01.00 no llegaba a pintar la copia

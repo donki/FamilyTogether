@@ -1,8 +1,24 @@
 using System.Globalization;
-using Android.Content;
 using FamilyTogether.Core;
 
-namespace FamilyTogether.Mobile.Platforms.Android;
+namespace FamilyTogether.Mobile.Services.Native;
+
+/// <summary>
+/// Almacén clave-valor de la parte nativa. En Android, unas <c>SharedPreferences</c> propias
+/// (<c>SharedPrefsStore</c>); en las pruebas, un diccionario.
+/// </summary>
+public interface IKeyValueStore
+{
+    bool GetBool(string key, bool fallback);
+
+    string? GetString(string key);
+
+    /// <summary>
+    /// Escribe varios valores de una vez (<c>string</c>, <c>bool</c> o <c>long</c>; <c>null</c> lo
+    /// quita), como un solo <c>Edit().Apply()</c>.
+    /// </summary>
+    void Apply(IReadOnlyDictionary<string, object?> changes);
+}
 
 /// <summary>
 /// Estado persistido de la parte nativa: si el usuario comparte su ubicación, la última posición
@@ -11,29 +27,32 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// <remarks>
 /// Va en <c>SharedPreferences</c> propias y no en <c>Preferences</c> de MAUI porque lo leen el
 /// receptor de arranque y el servicio con la app cerrada, y porque no debe mezclarse con los
-/// ajustes de la interfaz.
+/// ajustes de la interfaz. El almacén lo pone <c>MainApplication</c> al crear el proceso
+/// (<see cref="Store"/>).
 /// </remarks>
-internal static class SharingState
+public static class SharingState
 {
-    private const string PrefsName = "familytogether_location";
+    public const string PrefsName = "familytogether_location";
     private const string KeyEnabled = "enabled";
     private const string KeyLastLat = "last_lat";
     private const string KeyLastLon = "last_lon";
 
-    private static ISharedPreferences? Prefs =>
-        global::Android.App.Application.Context.GetSharedPreferences(PrefsName, FileCreationMode.Private);
+    /// <summary>El almacén (se pide en cada acceso, como las <c>SharedPreferences</c> de Android).</summary>
+    public static Func<IKeyValueStore?> Store { get; set; } = () => null;
+
+    private static IKeyValueStore? Prefs => Store();
 
     /// <summary>El usuario ha activado «compartir mi ubicación» y no lo ha desactivado.</summary>
     public static bool Enabled
     {
         get
         {
-            try { return Prefs?.GetBoolean(KeyEnabled, false) ?? false; }
+            try { return Prefs?.GetBool(KeyEnabled, false) ?? false; }
             catch { return false; }
         }
         set
         {
-            try { Prefs?.Edit()?.PutBoolean(KeyEnabled, value)?.Apply(); }
+            try { Prefs?.Apply(new Dictionary<string, object?> { [KeyEnabled] = value }); }
             catch (Exception ex) { NativeLog.Warn("No se pudo guardar si se comparte la ubicación.", ex); }
         }
     }
@@ -46,8 +65,8 @@ internal static class SharingState
             try
             {
                 var prefs = Prefs;
-                var lat = prefs?.GetString(KeyLastLat, null);
-                var lon = prefs?.GetString(KeyLastLon, null);
+                var lat = prefs?.GetString(KeyLastLat);
+                var lon = prefs?.GetString(KeyLastLon);
                 if (double.TryParse(lat, NumberStyles.Float, CultureInfo.InvariantCulture, out var la) &&
                     double.TryParse(lon, NumberStyles.Float, CultureInfo.InvariantCulture, out var lo))
                     return (la, lo);
@@ -62,20 +81,11 @@ internal static class SharingState
         {
             try
             {
-                var edit = Prefs?.Edit();
-                if (edit is null)
-                    return;
-                if (value is { } v)
+                Prefs?.Apply(new Dictionary<string, object?>
                 {
-                    edit.PutString(KeyLastLat, v.Lat.ToString("R", CultureInfo.InvariantCulture));
-                    edit.PutString(KeyLastLon, v.Lon.ToString("R", CultureInfo.InvariantCulture));
-                }
-                else
-                {
-                    edit.Remove(KeyLastLat);
-                    edit.Remove(KeyLastLon);
-                }
-                edit.Apply();
+                    [KeyLastLat] = value?.Lat.ToString("R", CultureInfo.InvariantCulture),
+                    [KeyLastLon] = value?.Lon.ToString("R", CultureInfo.InvariantCulture),
+                });
             }
             catch (Exception ex)
             {
@@ -99,10 +109,17 @@ internal static class SharingState
 
     /// <summary>
     /// Olvida la caché: la próxima lectura vuelve a preguntar al servidor. Lo llama
-    /// <see cref="LocationSharing.NotifySharingChanged"/> cuando la interfaz pausa, reanuda, entra o
+    /// <c>LocationSharing.NotifySharingChanged</c> cuando la interfaz pausa, reanuda, entra o
     /// sale de un grupo, para que la pausa se cumpla desde la siguiente posición (FR-018).
     /// </summary>
     public static void InvalidateGroups() => _refreshedAt = DateTimeOffset.MinValue;
+
+    /// <summary>Olvida también lo cargado del almacén (al cambiar de almacén, en las pruebas).</summary>
+    internal static void Reset()
+    {
+        _entries = null;
+        _refreshedAt = DateTimeOffset.MinValue;
+    }
 
     /// <summary>
     /// Grupos donde comparto en este momento: soy miembro, tengo la clave y no estoy en pausa
@@ -171,7 +188,7 @@ internal static class SharingState
         try
         {
             var prefs = Prefs;
-            var raw = prefs?.GetString(KeyGroups, null);
+            var raw = prefs?.GetString(KeyGroups);
             if (string.IsNullOrEmpty(raw))
                 return [];
 
@@ -204,10 +221,11 @@ internal static class SharingState
             var raw = string.Join(';', entries.Select(e =>
                 $"{e.Group:D}|{(e.Paused ? "1" : "0")}|{e.Until?.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) ?? string.Empty}"));
 
-            Prefs?.Edit()?
-                .PutString(KeyGroups, raw)?
-                .PutLong(KeyGroupsAt, at.ToUnixTimeMilliseconds())?
-                .Apply();
+            Prefs?.Apply(new Dictionary<string, object?>
+            {
+                [KeyGroups] = raw,
+                [KeyGroupsAt] = at.ToUnixTimeMilliseconds(),
+            });
         }
         catch (Exception ex)
         {

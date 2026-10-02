@@ -1,6 +1,7 @@
 using Android.Content;
 using Firebase;
 using FamilyTogether.Core;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
 

@@ -145,9 +145,14 @@ public sealed class ZoneEditPage : ContentPage
         _save.IsEnabled = false;
         try
         {
-            var me = ServiceHelper.Get<SupabaseClient>().UserGuid;
-            var zone = new Zone(_zone?.Id ?? Guid.Empty, _group.Id, name, _lat, _lon, _radius.Value, _zone?.CreatedBy ?? me);
-            if (await Ui.RunAsync(this, () => _family.SaveZoneAsync(zone)))
+            // La sesion, dentro de RunAsync: sin ella (aun no cargada) es un aviso, no un cierre de la app.
+            if (await Ui.RunAsync(this, async () =>
+            {
+                var client = ServiceHelper.Get<SupabaseClient>();
+                await client.EnsureSignedInAsync();
+                var zone = new Zone(_zone?.Id ?? Guid.Empty, _group.Id, name, _lat, _lon, _radius.Value, _zone?.CreatedBy ?? client.UserGuid);
+                await _family.SaveZoneAsync(zone);
+            }))
                 await Navigation.PopAsync();
         }
         finally

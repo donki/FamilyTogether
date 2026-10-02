@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
 

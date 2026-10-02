@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace FamilyTogether.Mobile.Platforms.Android;
+namespace FamilyTogether.Mobile.Services.Native;
 
 /// <summary>
 /// Textos visibles que solo existen en la parte nativa de Android: la guía de autoinicio.
@@ -12,7 +12,7 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// fija la localización de la app (castellano si el dispositivo está en castellano; inglés en
 /// cualquier otro caso, FR-023).
 /// </remarks>
-internal static class AndroidTexts
+public static class AndroidTexts
 {
     private static readonly Dictionary<string, string> Es = new()
     {

@@ -24,6 +24,9 @@ public sealed class MapView : ContentView
     private IDispatcherTimer? _events;
     private bool _started;
 
+    /// <summary>Cada cuanto se pregunta a la pagina si ya esta lista (100 veces). Las pruebas lo acortan.</summary>
+    internal static TimeSpan ReadyPoll { get; set; } = TimeSpan.FromMilliseconds(150);
+
     public MapView()
     {
         Content = _web;
@@ -87,7 +90,7 @@ public sealed class MapView : ContentView
 
             for (var i = 0; i < 100; i++)
             {
-                await Task.Delay(150);
+                await Task.Delay(ReadyPoll);
                 try
                 {
                     var answer = await _web.EvaluateJavaScriptAsync("(window.mapReady === true) ? 'yes' : 'no'");

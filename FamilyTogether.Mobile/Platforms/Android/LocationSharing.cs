@@ -6,7 +6,7 @@ using Android.OS;
 using Android.Provider;
 using AndroidX.Core.Content;
 using FamilyTogether.Mobile.Services;
-using AndroidLocation = Android.Locations.Location;
+using FamilyTogether.Mobile.Services.Native;
 using AndroidUri = Android.Net.Uri;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
@@ -62,12 +62,8 @@ public sealed class LocationSharing : ILocationSharing
         return CurrentState(AppContext);
     }
 
-    internal static LocationPermissionState CurrentState(Context context)
-    {
-        if (!HasFinePermission(context))
-            return LocationPermissionState.Denied;
-        return HasBackgroundPermission(context) ? LocationPermissionState.Always : LocationPermissionState.WhileInUse;
-    }
+    internal static LocationPermissionState CurrentState(Context context) =>
+        Autostart.PermissionState(HasFinePermission(context), HasBackgroundPermission(context));
 
     internal static bool HasFinePermission(Context context) =>
         ContextCompat.CheckSelfPermission(context, Manifest.Permission.AccessFineLocation) == Permission.Granted;
@@ -173,8 +169,7 @@ public sealed class LocationSharing : ILocationSharing
     /// <summary>La más reciente entre la del servicio y las últimas conocidas de cada proveedor.</summary>
     private static (double Lat, double Lon, double Accuracy, DateTimeOffset At, bool Stale)? LastKnown()
     {
-        AndroidLocation? best = LocationSharingForegroundService.LastFix;
-
+        var fromProviders = new List<LocationReading?>();
         try
         {
             if (HasFinePermission(AppContext) &&
@@ -182,9 +177,9 @@ public sealed class LocationSharing : ILocationSharing
             {
                 foreach (var provider in manager.GetProviders(false) ?? [])
                 {
-                    var candidate = manager.GetLastKnownLocation(provider);
-                    if (candidate is not null && (best is null || candidate.Time > best.Time))
-                        best = candidate;
+                    if (manager.GetLastKnownLocation(provider) is { } c)
+                        fromProviders.Add(new LocationReading(c.Provider, c.Latitude, c.Longitude,
+                            c.HasAccuracy ? c.Accuracy : null, null, DateTimeOffset.FromUnixTimeMilliseconds(c.Time)));
                 }
             }
         }
@@ -193,11 +188,7 @@ public sealed class LocationSharing : ILocationSharing
             NativeLog.Warn("No se pudo leer la última ubicación conocida.", ex);
         }
 
-        if (best is null)
-            return null;
-
-        return (best.Latitude, best.Longitude, best.HasAccuracy ? best.Accuracy : 0,
-            DateTimeOffset.FromUnixTimeMilliseconds(best.Time), true);
+        return Autostart.LastKnown(SharingEngine.LastFix, fromProviders);
     }
 
     // ==================================================================================
@@ -250,121 +241,19 @@ public sealed class LocationSharing : ILocationSharing
     //  Autoinicio del fabricante
     // ==================================================================================
 
-    private enum Vendor { Other, Xiaomi, Huawei, Oppo, Vivo, Samsung, Asus, Meizu }
+    /// <summary>El fabricante (ver <see cref="Autostart.Detect"/>).</summary>
+    private static Vendor CurrentVendor =>
+        Autostart.Detect(Build.Manufacturer, Build.Brand, Build.SupportedAbis?.FirstOrDefault());
 
-    /// <summary>
-    /// El fabricante, por <c>Build.Manufacturer</c> y, si no dice nada conocido, por <c>Build.Brand</c>.
-    /// Un Android sobre x86 es un emulador (MuMu, por ejemplo, se declara Samsung de arriba abajo):
-    /// no se sabe qué capa lleva y se trata como desconocido.
-    /// </summary>
-    private static Vendor CurrentVendor
-    {
-        get
+    public string? ManufacturerAutostartHint => Autostart.Hint(CurrentVendor);
+
+    public void OpenManufacturerAutostartSettings() =>
+        Autostart.Open(CurrentVendor, (package, activity) =>
         {
-            if (IsX86)
-                return Vendor.Other;
-
-            var byManufacturer = VendorOf(Build.Manufacturer);
-            return byManufacturer != Vendor.Other ? byManufacturer : VendorOf(Build.Brand);
-        }
-    }
-
-    private static bool IsX86
-    {
-        get
-        {
-            var abi = Build.SupportedAbis?.FirstOrDefault() ?? string.Empty;
-            return abi.StartsWith("x86", StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    private static Vendor VendorOf(string? value)
-    {
-        var text = (value ?? string.Empty).ToLowerInvariant();
-        if (text.Contains("xiaomi") || text.Contains("redmi") || text.Contains("poco")) return Vendor.Xiaomi;
-        if (text.Contains("huawei") || text.Contains("honor")) return Vendor.Huawei;
-        if (text.Contains("oppo") || text.Contains("realme") || text.Contains("oneplus")) return Vendor.Oppo;
-        if (text.Contains("vivo") || text.Contains("iqoo")) return Vendor.Vivo;
-        if (text.Contains("samsung")) return Vendor.Samsung;
-        if (text.Contains("asus")) return Vendor.Asus;
-        if (text.Contains("meizu")) return Vendor.Meizu;
-        return Vendor.Other;
-    }
-
-    /// <summary>
-    /// Solo Xiaomi, Redmi y POCO tienen texto propio (constitución General §6.13: no se nombran otros
-    /// fabricantes). Los demás, conocidos o no, reciben el genérico; el botón abre la pantalla del
-    /// fabricante si se conoce y, si no, los ajustes de la app.
-    /// </summary>
-    public string? ManufacturerAutostartHint => CurrentVendor == Vendor.Xiaomi
-        ? AndroidTexts.Get("AutostartXiaomi")
-        : AndroidTexts.Get("AutostartGeneric");
-
-    /// <summary>
-    /// Pantallas conocidas de autoinicio / ahorro de batería de cada capa. Cambian entre versiones,
-    /// así que se prueban en orden; si ninguna existe (o no es accesible), se abren los ajustes de la
-    /// app. Se prueba lanzando y capturando el error, sin consultar el gestor de paquetes: así no
-    /// hace falta declarar esos paquetes en <c>&lt;queries&gt;</c>.
-    /// </summary>
-    private static readonly Dictionary<Vendor, (string Package, string Activity)[]> AutostartScreens = new()
-    {
-        [Vendor.Xiaomi] =
-        [
-            ("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
-            ("com.miui.securitycenter", "com.miui.powercenter.PowerSettings"),
-        ],
-        [Vendor.Huawei] =
-        [
-            ("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
-            ("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"),
-            ("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
-            ("com.hihonor.systemmanager", "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
-        ],
-        [Vendor.Oppo] =
-        [
-            ("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
-            ("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
-            ("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"),
-            ("com.oneplus.security", "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity"),
-        ],
-        [Vendor.Vivo] =
-        [
-            ("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
-            ("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"),
-            ("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"),
-        ],
-        [Vendor.Samsung] =
-        [
-            ("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"),
-            ("com.samsung.android.sm", "com.samsung.android.sm.ui.battery.BatteryActivity"),
-        ],
-        [Vendor.Asus] =
-        [
-            ("com.asus.mobilemanager", "com.asus.mobilemanager.autostart.AutoStartActivity"),
-            ("com.asus.mobilemanager", "com.asus.mobilemanager.entry.FunctionActivity"),
-        ],
-        [Vendor.Meizu] =
-        [
-            ("com.meizu.safe", "com.meizu.safe.permission.SmartBGActivity"),
-            ("com.meizu.safe", "com.meizu.safe.permission.PermissionMainActivity"),
-        ],
-    };
-
-    public void OpenManufacturerAutostartSettings()
-    {
-        if (AutostartScreens.TryGetValue(CurrentVendor, out var screens))
-        {
-            foreach (var (package, activity) in screens)
-            {
-                var intent = new Intent();
-                intent.SetComponent(new ComponentName(package, activity));
-                if (TryStart(intent))
-                    return;
-            }
-        }
-
-        OpenAppSettings();
-    }
+            var intent = new Intent();
+            intent.SetComponent(new ComponentName(package, activity));
+            return TryStart(intent);
+        }, OpenAppSettings);
 
     // ==================================================================================
 

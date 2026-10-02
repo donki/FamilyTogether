@@ -1,5 +1,19 @@
 [
   {
+    "version": "2026.10.03.00",
+    "date": "2026-10-03",
+    "es": [
+      "Si cambias de grupo, persona o día en el Mapa o el Historial mientras carga, ahora se enseña lo que elegiste.",
+      "Arreglados dos cierres de la app: al guardar una zona y al cambiar la foto o el nombre en Ajustes justo al abrir la app.",
+      "Los errores del servidor al cargar los grupos ahora dicen qué pasa en vez de «error inesperado»."
+    ],
+    "en": [
+      "If you change group, person or day on the Map or in History while it is loading, it now shows what you chose.",
+      "Fixed two crashes: when saving a zone, and when changing your photo or name in Settings right after opening the app.",
+      "Server errors while loading groups now say what happened instead of \"unexpected error\"."
+    ]
+  },
+  {
     "version": "2026.10.01.01",
     "date": "2026-10-01",
     "es": [

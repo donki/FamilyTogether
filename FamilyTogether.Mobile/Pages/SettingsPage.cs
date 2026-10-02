@@ -158,7 +158,7 @@ public sealed class SettingsPage : ContentPage
         App.AppResumed -= OnResumed;
     }
 
-    private void OnResumed(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(async () => await ShowPermissionsAsync());
+    private void OnResumed(object? sender, EventArgs e) => UiThread.Post(async () => await ShowPermissionsAsync());
 
     // ------------------------------------------------------------------ idioma
 
@@ -193,7 +193,7 @@ public sealed class SettingsPage : ContentPage
         {
             var shell = new AppShell();
             window.Page = shell;
-            MainThread.BeginInvokeOnMainThread(async () =>
+            UiThread.Post(async () =>
             {
                 try
                 {
@@ -238,7 +238,10 @@ public sealed class SettingsPage : ContentPage
 
     private void ShowAvatar()
     {
-        _avatar.Set(ServiceHelper.Get<SupabaseClient>().UserGuid, _name.Text, _avatarBase64);
+        // UserId y no UserGuid: sin sesion cargada todavia, UserGuid lanza y esto corre en manejadores
+        // async void (quitar la foto, guardar el nombre), donde tumbaria la app.
+        var me = Guid.TryParse(ServiceHelper.Get<SupabaseClient>().UserId, out var id) ? id : Guid.Empty;
+        _avatar.Set(me, _name.Text, _avatarBase64);
         _removeAvatar.IsVisible = _avatarBase64 is not null;
     }
 

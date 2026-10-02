@@ -27,7 +27,7 @@ public sealed class MauiOAuthBrowser : IOAuthBrowser
         // invertido, y dar por hecho el esquema de la app dejaria la pestaña esperando para siempre.
         var callbackUrl = new Uri(ReadParameter(authorizeUrl, "redirect_uri") ?? RedirectUri);
 
-        var result = await MainThread.InvokeOnMainThreadAsync(() => WebAuthenticator.Default.AuthenticateAsync(
+        var result = await UiThread.InvokeAsync(() => WebAuthenticator.Default.AuthenticateAsync(
             new WebAuthenticatorOptions
             {
                 Url = authorizeUrl,

@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Cobertura (coverlet): tambien el ensamblado de pruebas, porque ahi se compilan los ficheros de la
-  app MAUI enlazados (Strings, Loc, TimeTexts, NotificationTexts); el codigo de las propias pruebas
-  se excluye por ruta.
+  Cobertura (coverlet): el nucleo y la app MAUI compilada para net10.0 (App\FamilyTogether.App.csproj).
+  El codigo de las propias pruebas se excluye por ruta. CompilerGeneratedAttribute NO se excluye: los
+  metodos async y las lambdas cuentan (tools\cobertura-app.py).
 -->
 <RunSettings>
   <DataCollectionRunSettings>
     <DataCollectors>
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
-          <IncludeTestAssembly>true</IncludeTestAssembly>
           <ExcludeByFile>**/FamilyTogether.Core.Tests/**/*.cs</ExcludeByFile>
-          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <ExcludeByAttribute>GeneratedCodeAttribute</ExcludeByAttribute>
         </Configuration>
       </DataCollector>
     </DataCollectors>

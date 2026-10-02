@@ -52,7 +52,7 @@ public partial class App : Application
     {
         _pendingLink = uri;
         if (Current?.Windows.FirstOrDefault()?.Page is AppShell)
-            MainThread.BeginInvokeOnMainThread(DeliverPendingLink);
+            UiThread.Post(DeliverPendingLink);
     }
 
     private static void DeliverPendingLink()

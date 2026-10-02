@@ -3,6 +3,7 @@ using Firebase.Messaging;
 using FamilyTogether.Mobile.Services;
 using GmsTask = Android.Gms.Tasks.Task;
 using Task = System.Threading.Tasks.Task;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
 

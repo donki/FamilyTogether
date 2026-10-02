@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using FamilyTogether.Core;
 using FamilyTogether.Mobile.Localization;
 using FamilyTogether.Mobile.Services;
-using Microsoft.Maui.Storage;
+using FamilyTogether.Core.Tests.Ui;
 
 namespace FamilyTogether.Core.Tests.Mobile;
 
@@ -20,8 +20,8 @@ public partial class MobileTextsTests : IDisposable
     public void Dispose()
     {
         // Loc.Apply cambia la cultura del proceso: se deja como estaba para las demas pruebas.
-        Preferences.Default.Broken = false;
-        Preferences.Default.Values.Clear();
+        MauiFakes.Preferences.Broken = false;
+        MauiFakes.Preferences.Values.Clear();
         CultureInfo.DefaultThreadCurrentCulture = null;
         CultureInfo.DefaultThreadCurrentUICulture = null;
         CultureInfo.CurrentCulture = _culture;
@@ -199,7 +199,7 @@ public partial class MobileTextsTests : IDisposable
     [Fact]
     public void SinPreferenciasFuncionaIgual()
     {
-        Preferences.Default.Broken = true;
+        MauiFakes.Preferences.Broken = true;
         Assert.Equal(Loc.System, Loc.Preference);
         Loc.SetPreference(Loc.English);   // no lanza; esta sesion sigue con lo que habia
         Assert.Contains(Loc.Language, new[] { "es", "en" });

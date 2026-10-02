@@ -1,15 +1,17 @@
-using FamilyTogether.Mobile.Services;
-
-namespace FamilyTogether.Mobile.Platforms.Android;
+namespace FamilyTogether.Mobile.Services.Native;
 
 /// <summary>
 /// Registro de la parte nativa: al logcat y al registro común de la app
 /// (<see cref="CrashLog"/>, <c>AppDataDirectory/familytogether.log</c>), con la traza completa
 /// (constitución General §6.12). Nunca lanza: un registro que falla no puede tumbar nada.
 /// </summary>
-internal static class NativeLog
+public static class NativeLog
 {
-    private const string Tag = "FamilyTogether";
+    /// <summary>
+    /// Salida al logcat (nivel, línea). La pone <c>MainApplication</c> con <c>Android.Util.Log</c>;
+    /// sin ella, solo el fichero.
+    /// </summary>
+    public static Action<string, string>? Logcat { get; set; }
 
     public static void Info(string message) => Write("INFO", message, null);
 
@@ -23,12 +25,7 @@ internal static class NativeLog
 
         try
         {
-            switch (level)
-            {
-                case "ERROR": global::Android.Util.Log.Error(Tag, line); break;
-                case "WARN": global::Android.Util.Log.Warn(Tag, line); break;
-                default: global::Android.Util.Log.Info(Tag, line); break;
-            }
+            Logcat?.Invoke(level, line);
         }
         catch
         {

@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
 

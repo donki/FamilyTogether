@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    La aplicacion MAUI (paginas, controles, servicios de la interfaz y la logica sacada de la parte
+    nativa), ENLAZADA tal cual y compilada para net10.0, sin Android. Solo existe para las pruebas
+    (FamilyTogether.Core.Tests): va en una biblioteca aparte para que coverlet la mida, porque el codigo
+    compilado dentro del propio ensamblado de pruebas no se instrumenta. La aplicacion no la usa.
+    Platforms\Android no se compila aqui: lo que queda alli es la llamada nativa minima y cuenta como
+    no cubierto en la cobertura de toda la app.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>FamilyTogether.Mobile</RootNamespace>
+    <AssemblyName>FamilyTogether.App</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultMauiItems>false</EnableDefaultMauiItems>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.2" />
+    <PackageReference Include="ZXing.Net.Maui.Controls" Version="0.10.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\FamilyTogether.Core\FamilyTogether.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FamilyTogether.Core.Tests" />
+  </ItemGroup>
+
+  <!-- Todo lo de la app salvo Platforms\ (Android), tal cual. -->
+  <ItemGroup>
+    <Compile Include="..\..\FamilyTogether.Mobile\**\*.cs" Exclude="..\..\FamilyTogether.Mobile\obj\**;..\..\FamilyTogether.Mobile\bin\**;..\..\FamilyTogether.Mobile\Platforms\**" Link="App\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\..\Shared\ModernDialog.cs" Link="Shared\ModernDialog.cs" />
+    <MauiXaml Include="..\..\FamilyTogether.Mobile\**\*.xaml" Exclude="..\..\FamilyTogether.Mobile\obj\**;..\..\FamilyTogether.Mobile\bin\**;..\..\FamilyTogether.Mobile\Platforms\**" Link="App\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

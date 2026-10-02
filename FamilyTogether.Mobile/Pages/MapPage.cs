@@ -35,6 +35,9 @@ public sealed class MapPage : ContentPage, IBackHandler
     private IReadOnlyList<Group> _groups = [];
     private IDispatcherTimer? _timer;
     private bool _loading;
+
+    /// <summary>Se pidio otra carga mientras se cargaba (y si era en silencio).</summary>
+    private bool? _loadAgain;
     private bool _fitted;
     private bool _pickerUpdating;
 
@@ -267,7 +270,7 @@ public sealed class MapPage : ContentPage, IBackHandler
         return timer;
     }
 
-    private void OnResumed(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(async () => await LoadAsync(quiet: true));
+    private void OnResumed(object? sender, EventArgs e) => UiThread.Post(async () => await LoadAsync(quiet: true));
 
     private async void OnGroupChanged(object? sender, EventArgs e)
     {
@@ -286,7 +289,12 @@ public sealed class MapPage : ContentPage, IBackHandler
     private async Task LoadAsync(bool quiet = false)
     {
         if (_loading)
+        {
+            // Se vuelve a cargar al acabar (p. ej. se eligio otro grupo mientras cargaba: si no, el
+            // mapa seguia con el de antes hasta el siguiente refresco). Con aviso si alguna lo pedia.
+            _loadAgain = (_loadAgain ?? true) && quiet;
             return;
+        }
         _loading = true;
         _busy.IsVisible = _busy.IsRunning = true;
 
@@ -342,6 +350,11 @@ public sealed class MapPage : ContentPage, IBackHandler
         {
             _loading = false;
             _busy.IsVisible = _busy.IsRunning = false;
+            if (_loadAgain is { } again)
+            {
+                _loadAgain = null;
+                await LoadAsync(again);
+            }
         }
     }
 

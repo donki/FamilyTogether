@@ -5,6 +5,7 @@ using AndroidX.Core.App;
 using FamilyTogether.Core;
 using FamilyTogether.Mobile.Localization;
 using FamilyTogether.Mobile.Services;
+using FamilyTogether.Mobile.Services.Native;
 using AndroidUri = Android.Net.Uri;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
@@ -30,13 +31,10 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// </remarks>
 public sealed class Notifier : INotifier
 {
-    public const string ChannelSos = "sos";
-    public const string ChannelZones = "zones";
-    public const string ChannelRequests = "requests";
-    public const string ChannelService = "service";
-
-    /// <summary>Id de la notificación fija del servicio; los avisos nunca lo usan.</summary>
-    internal const int ServiceNotificationId = 4101;
+    private const string ChannelSos = NotificationRules.ChannelSos;
+    private const string ChannelZones = NotificationRules.ChannelZones;
+    private const string ChannelRequests = NotificationRules.ChannelRequests;
+    private const string ChannelService = NotificationRules.ChannelService;
 
     private static readonly long[] SosVibration = [0, 600, 250, 600, 250, 600];
 
@@ -81,8 +79,8 @@ public sealed class Notifier : INotifier
             EnsureChannels(context);
 
             var (title, body) = NotificationTexts.Build(content);
-            var channel = ChannelFor(content.Channel);
-            var id = NotificationIdFor(content.EventId);
+            var channel = NotificationRules.ChannelFor(content.Channel);
+            var id = NotificationRules.NotificationIdFor(content.EventId);
             var isSos = channel == ChannelSos;
 
             // Cada Set* del binding devuelve un Builder anulable: se llama sobre la misma variable.
@@ -127,7 +125,7 @@ public sealed class Notifier : INotifier
     {
         try
         {
-            NotificationManagerCompat.From(global::Android.App.Application.Context)?.Cancel(NotificationIdFor(eventId));
+            NotificationManagerCompat.From(global::Android.App.Application.Context)?.Cancel(NotificationRules.NotificationIdFor(eventId));
         }
         catch (Exception ex)
         {
@@ -179,39 +177,7 @@ public sealed class Notifier : INotifier
         }
     }
 
-    /// <summary>
-    /// Texto localizado de la app; si la localización aún no está lista (proceso arrancado por FCM
-    /// o por el reinicio), el de reserva en inglés.
-    /// </summary>
-    internal static string Text(string key, string fallback)
-    {
-        try
-        {
-            var text = Loc.Get(key);
-            return string.IsNullOrWhiteSpace(text) || text == key ? fallback : text;
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    private static string ChannelFor(string? channel) => channel switch
-    {
-        ChannelSos => ChannelSos,
-        ChannelZones => ChannelZones,
-        _ => ChannelRequests,
-    };
-
-    /// <summary>
-    /// Id estable a partir del evento. <see cref="Guid.GetHashCode"/> es determinista (sale de los
-    /// bytes), así que el mismo evento da el mismo id en cualquier proceso. Se evita el del servicio.
-    /// </summary>
-    internal static int NotificationIdFor(Guid eventId)
-    {
-        var id = eventId.GetHashCode() & 0x7FFFFFFF;
-        return id == ServiceNotificationId ? id + 1 : id;
-    }
+    private static string Text(string key, string fallback) => NotificationRules.Text(key, fallback);
 
     /// <summary>
     /// Al tocar el aviso se abre la app en ese grupo y evento: <see cref="MainActivity"/> recibe
@@ -221,13 +187,7 @@ public sealed class Notifier : INotifier
     /// </summary>
     private static PendingIntent? OpenAppIntent(Context context, NotificationContent content, int requestCode)
     {
-        var link = $"{MainActivity.DeepLinkScheme}://event" +
-                   $"?type={Uri.EscapeDataString(content.EventType ?? string.Empty)}" +
-                   $"&group={content.GroupId:D}&event={content.EventId:D}";
-
-        // SOS y zonas: el mapa se centra en el sitio del aviso en vez de enseñar todo el grupo.
-        if (content is { Lat: { } lat, Lon: { } lon })
-            link += FormattableString.Invariant($"&lat={lat:R}&lon={lon:R}");
+        var link = NotificationRules.EventLink(content);
 
         var intent = new Intent(context, typeof(MainActivity));
         intent.SetAction(Intent.ActionView);

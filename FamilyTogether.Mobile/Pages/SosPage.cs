@@ -15,6 +15,9 @@ public sealed class SosPage : ContentPage, IBackHandler
 {
     private const int CountdownSeconds = 3;
 
+    /// <summary>Lo que dura cada segundo de la cuenta atras (las pruebas lo acortan).</summary>
+    internal static TimeSpan CountdownTick { get; set; } = TimeSpan.FromSeconds(1);
+
     private readonly FamilyService _family = ServiceHelper.Get<FamilyService>();
     private readonly SosService _sos = ServiceHelper.Get<SosService>();
     private readonly ILocationSharing? _sharing = ServiceHelper.TryGet<ILocationSharing>();
@@ -155,7 +158,7 @@ public sealed class SosPage : ContentPage, IBackHandler
                     // Sin vibrador no pasa nada.
                 }
 
-                await Task.Delay(1000, token);
+                await Task.Delay(CountdownTick, token);
             }
 
             // Si los grupos aun no han llegado, se espera a tenerlos: sin ellos no hay a quien enviar.

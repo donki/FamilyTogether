@@ -44,7 +44,7 @@ public partial class AboutPage : ContentPage
 
         var shell = new AppShell();
         window.Page = shell;
-        MainThread.BeginInvokeOnMainThread(async () =>
+        UiThread.Post(async () =>
         {
             try
             {

@@ -4,6 +4,7 @@ using Android.Content.PM;
 using Android.OS;
 using AndroidX.Core.View;
 using FamilyTogether.Mobile.Platforms.Android;
+using FamilyTogether.Mobile.Services.Native;
 using AndroidView = Android.Views.View;
 
 namespace FamilyTogether.Mobile;
@@ -32,7 +33,7 @@ namespace FamilyTogether.Mobile;
 public class MainActivity : MauiAppCompatActivity
 {
     /// <summary>Esquema propio de los enlaces de la app (QR de invitación y avisos).</summary>
-    public const string DeepLinkScheme = "familytogether";
+    public const string DeepLinkScheme = NotificationRules.DeepLinkScheme;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -65,13 +66,8 @@ public class MainActivity : MauiAppCompatActivity
         try
         {
             var data = intent?.Data?.ToString();
-            if (string.IsNullOrWhiteSpace(data))
-                return;
-
-            if (!data.StartsWith(DeepLinkScheme + "://", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            App.HandleDeepLink(data);
+            if (NotificationRules.IsAppLink(data))
+                App.HandleDeepLink(data!);
         }
         catch (Exception ex)
         {

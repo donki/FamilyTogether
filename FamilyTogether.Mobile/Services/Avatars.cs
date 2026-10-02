@@ -62,9 +62,12 @@ public static class Avatars
         if (photo is null)
             return null;
 
-        await using var stream = await photo.OpenReadAsync();
+        await using var stream = await OpenPhoto(photo);
         return await ToAvatarAsync(stream);
     }
+
+    /// <summary>Abre la foto elegida. Las pruebas lo cambian: fuera de Android, MAUI no sabe abrirla.</summary>
+    internal static Func<FileResult, Task<Stream>> OpenPhoto { get; set; } = photo => photo.OpenReadAsync();
 
     private static async Task<string> ToAvatarAsync(Stream stream)
     {

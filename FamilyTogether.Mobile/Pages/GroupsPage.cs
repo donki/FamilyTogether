@@ -86,7 +86,7 @@ public sealed class GroupsPage : ContentPage
         App.AppResumed -= OnResumed;
     }
 
-    private void OnResumed(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(async () => await LoadAsync());
+    private void OnResumed(object? sender, EventArgs e) => UiThread.Post(async () => await LoadAsync());
 
     private async Task LoadAsync()
     {

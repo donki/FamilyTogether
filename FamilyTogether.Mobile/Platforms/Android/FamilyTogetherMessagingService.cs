@@ -2,6 +2,7 @@ using Android.App;
 using Firebase.Messaging;
 using FamilyTogether.Core;
 using FamilyTogether.Mobile.Services;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile.Platforms.Android;
 
@@ -33,11 +34,8 @@ public class FamilyTogetherMessagingService : FirebaseMessagingService
 
         try
         {
-            var family = PlatformServiceLocator.Get<FamilyService>();
-            if (family is null || string.IsNullOrWhiteSpace(token))
-                return;
-
-            family.RegisterPushTokenAsync(token).WaitAsync(HandleTimeout).GetAwaiter().GetResult();
+            PushMessages.RegisterTokenAsync(PlatformServiceLocator.Get<FamilyService>(), token)
+                .WaitAsync(HandleTimeout).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -52,55 +50,14 @@ public class FamilyTogetherMessagingService : FirebaseMessagingService
 
         try
         {
-            HandleAsync(message).WaitAsync(HandleTimeout).GetAwaiter().GetResult();
+            PushMessages.HandleAsync(message.Data, PlatformServiceLocator.Get<FamilyService>(), PlatformServiceLocator.Get<EventFeed>(),
+                    () => PlatformServiceLocator.Get<INotifier>() ?? new Notifier())
+                .WaitAsync(HandleTimeout).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
             // Si falla (sin red, sin clave), el servicio de ubicación lo recogerá en su consulta.
             NativeLog.Warn("No se pudo procesar un mensaje de FCM.", ex);
         }
-    }
-
-    private static async Task HandleAsync(RemoteMessage message)
-    {
-        var data = message.Data;
-        if (data is null)
-            return;
-
-        data.TryGetValue("type", out var type);
-        if (string.IsNullOrEmpty(type))
-            return;
-
-        // Alguien ha recuperado su cuenta en otro móvil y pide la clave de un grupo: se le entrega
-        // en silencio, sin aviso visible (ARQUITECTURA §5).
-        if (type == "key_share")
-        {
-            var family = PlatformServiceLocator.Get<FamilyService>();
-            if (family is not null)
-                await family.FulfillPendingKeySharesAsync().ConfigureAwait(false);
-            return;
-        }
-
-        if (!data.TryGetValue("group_id", out var groupText) || !Guid.TryParse(groupText, out var groupId))
-            return;
-        if (!data.TryGetValue("event_id", out var eventText) || !Guid.TryParse(eventText, out var eventId))
-            return;
-
-        var notifier = PlatformServiceLocator.Get<INotifier>() ?? new Notifier();
-
-        // Otro administrador ha resuelto una solicitud: el aviso «X quiere unirse» (mismo event_id)
-        // ya no pinta nada en la barra. Si la solicitud es mía, justo después sale su resolución.
-        if (type == EventTypes.RequestResolved)
-            notifier.Cancel(eventId);
-
-        var feed = PlatformServiceLocator.Get<EventFeed>();
-        if (feed is null)
-            return;
-
-        var content = await feed.ResolveAsync(type, groupId, eventId).ConfigureAwait(false);
-        if (content is null)
-            return;   // Repetido o ya no aplica.
-
-        notifier.Show(content);
     }
 }

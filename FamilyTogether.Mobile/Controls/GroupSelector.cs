@@ -58,6 +58,12 @@ public sealed class GroupSelector : ContentView
                 CrashLog.Info($"grupos: sin servidor ({ex.Code}); se usa la ultima lista");
                 groups = cached;
             }
+            catch (Exception ex)
+            {
+                // Cualquier otro error (p. ej. la sesion ya no vale) se dice, como la primera vez.
+                await Ui.ShowErrorAsync(page, ex);
+                return Selected;
+            }
         }
         else
         {

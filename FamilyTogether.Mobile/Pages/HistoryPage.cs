@@ -33,7 +33,8 @@ public sealed class HistoryPage : ContentPage
     private readonly Label _snapStatus = new();
     private CancellationTokenSource? _snapCancel;
     private List<object[]> _stops = [];
-    private static readonly TimeSpan SnapLimit = TimeSpan.FromSeconds(75);
+    /// <summary>Tope total del ajuste a calles. Las pruebas lo acortan.</summary>
+    internal static TimeSpan SnapLimit { get; set; } = TimeSpan.FromSeconds(75);
     private readonly GroupSelector _selector = new();
     private readonly Picker _member = new();
     private readonly Picker _period = new();
@@ -45,6 +46,7 @@ public sealed class HistoryPage : ContentPage
     private IReadOnlyList<Member> _members = [];
     private bool _updating;
     private bool _loading;
+    private bool _loadAgain;
 
     /// <summary>Ultimos miembros de cada grupo (en memoria): sin conexion se sigue viendo mi recorrido local.</summary>
     private static readonly Dictionary<Guid, IReadOnlyList<Member>> s_lastMembers = [];
@@ -191,6 +193,11 @@ public sealed class HistoryPage : ContentPage
             {
                 members = cached;
             }
+            catch (Exception ex)
+            {
+                await Ui.ShowErrorAsync(this, ex);
+                return;
+            }
         }
         else
         {
@@ -222,7 +229,15 @@ public sealed class HistoryPage : ContentPage
 
     private async Task LoadTrackAsync()
     {
-        if (_loading || _selector.Selected is not { } group || _member.SelectedIndex < 0 || _member.SelectedIndex >= _members.Count)
+        // Si se cambia de persona, de dia o de grupo mientras se carga, se vuelve a cargar al
+        // acabar: si no, el cambio se perdia y el mapa seguia con el recorrido de antes.
+        if (_loading)
+        {
+            _loadAgain = true;
+            return;
+        }
+
+        if (_selector.Selected is not { } group || _member.SelectedIndex < 0 || _member.SelectedIndex >= _members.Count)
             return;
 
         _loading = true;
@@ -250,6 +265,13 @@ public sealed class HistoryPage : ContentPage
                 catch (FamilyTogetherException ex) when (ex.IsNetwork || ex.Code == FamilyTogetherException.Server)
                 {
                     (ok, points, offline) = (false, null, true);
+                }
+                catch (Exception ex)
+                {
+                    // Otro error (ya no soy del grupo, la sesion no vale...): se dice, y lo del movil
+                    // se sigue viendo.
+                    await Ui.ShowErrorAsync(this, ex);
+                    (ok, points) = (false, null);
                 }
             }
             else
@@ -317,6 +339,11 @@ public sealed class HistoryPage : ContentPage
         finally
         {
             _loading = false;
+            if (_loadAgain)
+            {
+                _loadAgain = false;
+                await LoadTrackAsync();
+            }
         }
     }
 

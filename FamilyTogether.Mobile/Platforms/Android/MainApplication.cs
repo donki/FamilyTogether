@@ -2,6 +2,7 @@ using Android.App;
 using Android.Runtime;
 using FamilyTogether.Mobile.Platforms.Android;
 using FamilyTogether.Mobile.Services;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile;
 
@@ -16,6 +17,18 @@ public class MainApplication : MauiApplication
         // también viven en este proceso. Los de .NET (AppDomain y TaskScheduler) los engancha
         // CrashLog.Hook desde MauiProgram, común a todas las plataformas.
         AndroidEnvironment.UnhandledExceptionRaiser += OnUnhandledException;
+
+        // La parte nativa sin Android (Services\Native): su logcat y su almacén.
+        NativeLog.Logcat = (level, line) =>
+        {
+            switch (level)
+            {
+                case "ERROR": global::Android.Util.Log.Error("FamilyTogether", line); break;
+                case "WARN": global::Android.Util.Log.Warn("FamilyTogether", line); break;
+                default: global::Android.Util.Log.Info("FamilyTogether", line); break;
+            }
+        };
+        SharingState.Store = SharedPrefsStore.Open;
     }
 
     protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();

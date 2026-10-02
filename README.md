@@ -41,22 +41,44 @@ dotnet test FamilyTogether.Core.Tests
 
 ## Pruebas
 
-265 pruebas (xUnit), todas pasan; el banco tarda unos 6 s (sin contar la compilación). Medido el
-2026-10-01:
+498 pruebas (xUnit), todas pasan; el banco tarda unos 22 s (sin contar la compilación). Medido el
+2026-10-03:
 
-- **Cobertura de lo instrumentado: 99 %** de las líneas (`FamilyTogether.Core` más los ficheros de
-  la app enlazados a las pruebas: textos es/en, `Loc`, horas y textos de los avisos).
-- **Cobertura sobre toda la app: 33 %** (3243 de ~9830 líneas de C# de Core y Mobile). Lo que queda
-  es la interfaz MAUI y los servicios de Android (ubicación, FCM, avisos), que no se prueban aquí.
+- **Cobertura de lo instrumentado: 98,0 %** de las líneas (5276 de 5382).
+- **Cobertura sobre toda la app: 90,1 %** (5276 de 5855 líneas ejecutables de C# de Core y Mobile).
+
+Cómo se consigue: `FamilyTogether.Core.Tests\App\FamilyTogether.App.csproj` compila **toda la app
+MAUI** (páginas, controles, servicios y la lógica de la parte nativa) para `net10.0`, sin Android,
+y las pruebas crean las páginas con su constructor y las manejan sin pantalla (`Ui\`: pulsan
+botones, contestan los diálogos, disparan los temporizadores) con dobles de MAUI (preferencias,
+almacén seguro, hilo principal, animaciones, WebView del mapa) y un servidor Supabase falso con
+estado (`World`). Lo que hacía el servicio de ubicación, el FCM, los avisos y el inicio automático
+está en `Services\Native\` (sin tipos de Android); en `Platforms\Android` solo queda la llamada al
+sistema, que no se ejecuta aquí y **cuenta como no cubierta** (unas 470 líneas: es casi todo lo que
+falta).
+
+**Cómo se cuenta «toda la app»** (`tools\cobertura-app.py`, el mismo script que Credentials):
+
+- Ficheros: todos los `.cs` de `FamilyTogether.Core` y `FamilyTogether.Mobile`, sin `obj\`, `bin\`,
+  `*.g.cs`, `*.Designer.cs` ni los proyectos de pruebas.
+- Fichero que compila el banco: sus líneas ejecutables son las que marca coverlet (sin excluir
+  `CompilerGeneratedAttribute`: los métodos `async` y las lambdas cuentan), menos las llaves sueltas.
+- Fichero que el banco no compila (`Platforms\Android`): solo cuentan las **sentencias**; no cuentan
+  líneas vacías, comentarios, directivas, llaves y paréntesis sueltos, `using`/`namespace`,
+  atributos (también los partidos en varias líneas), constantes, campos sin inicializar, firmas
+  de métodos y propiedades, declaraciones sin cuerpo (`static extern`), `else`/`try`/`finally`/
+  `case`, ni nada dentro de interfaces y enum. Todas cuentan como **no cubiertas**.
+- Lo que va dentro de `#if ANDROID` en un fichero compilado no lo ve coverlet y no cuenta (unas 30
+  líneas).
 
 El servidor es falso (`FakeSupabase`): ninguna prueba sale a la red. Las de integración contra el
 Supabase real solo corren con `FT_INTEGRATION=1`.
 
 ```powershell
 dotnet test FamilyTogether.Core.Tests
-# con cobertura (ReportGenerator es herramienta local: dotnet tool restore)
+# con cobertura
 dotnet test FamilyTogether.Core.Tests --collect:"XPlat Code Coverage" --results-directory cov
-dotnet reportgenerator -reports:cov/*/coverage.cobertura.xml -targetdir:cov/rep -reporttypes:TextSummary
+python tools\cobertura-app.py cov --detalle
 ```
 
 ## Licencia
