@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="sos_widget_label">SOS</string>
+  <string name="sos_widget_description">Enviar un SOS a tus grupos (cuenta atrás de 3 segundos, con Cancelar)</string>
+</resources>

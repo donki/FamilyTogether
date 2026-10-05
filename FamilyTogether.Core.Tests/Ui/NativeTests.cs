@@ -619,6 +619,24 @@ public class NativeTests : IDisposable
     }
 
     [Fact]
+    public void AlarmaSos_EncendidaPorDefectoYSeGuarda()
+    {
+        Assert.True(SharingState.SosLoud);
+        SharingState.SosLoud = false;
+        Assert.False(SharingState.SosLoud);
+        Assert.Equal(false, _store.Values["sos_loud"]);
+        SharingState.SosLoud = true;
+        Assert.True(SharingState.SosLoud);
+
+        // Almacen roto o sin almacen: suena (lo seguro en un SOS) y guardar no rompe nada.
+        _store.Broken = true;
+        Assert.True(SharingState.SosLoud);
+        SharingState.SosLoud = false;
+        SharingState.Store = () => null;
+        Assert.True(SharingState.SosLoud);
+    }
+
+    [Fact]
     public void Avisos_CanalIdEnlaceYTextos()
     {
         Assert.Equal("sos", NotificationRules.ChannelFor("sos"));
@@ -631,7 +649,11 @@ public class NativeTests : IDisposable
         Assert.True(NotificationRules.NotificationIdFor(id) >= 0);
         // Un evento cuyo hash da el id del servicio se aparta.
         var clash = Enumerable.Range(0, 1).Select(_ => GuidWithHash(NotificationRules.ServiceNotificationId)).First();
-        Assert.Equal(NotificationRules.ServiceNotificationId + 1, NotificationRules.NotificationIdFor(clash));
+        Assert.Equal(NotificationRules.ServiceNotificationId + 2, NotificationRules.NotificationIdFor(clash));
+        var alarmClash = GuidWithHash(NotificationRules.SosAlarmNotificationId);
+        Assert.Equal(NotificationRules.SosAlarmNotificationId + 2, NotificationRules.NotificationIdFor(alarmClash));
+        Assert.Equal("familytogether://sos", NotificationRules.SosLink);
+        Assert.True(NotificationRules.IsAppLink(NotificationRules.SosLink));
 
         var group = Guid.NewGuid();
         var content = new NotificationContent("sos", "sos", group, id, "Casa", "Ana", null, null, 40.5, -3.25);

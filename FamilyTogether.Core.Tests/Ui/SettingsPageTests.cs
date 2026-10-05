@@ -2,6 +2,7 @@ using FamilyTogether.Mobile;
 using FamilyTogether.Mobile.Localization;
 using FamilyTogether.Mobile.Pages;
 using FamilyTogether.Mobile.Services;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Core.Tests.Ui;
 
@@ -199,6 +200,27 @@ public class SettingsPageTests : IDisposable
 
         page.ClickKey("ClearHistory");
         await page.AnswerKeyAsync("Cancel");
+    }
+
+    [Fact]
+    public async Task AlarmaSosAunqueEsteEnSilencio()
+    {
+        var store = new MemoryStore();
+        SharingState.Store = () => store;
+        try
+        {
+            var page = await OpenAsync();
+            Assert.True(page.Shows(Loc.Get("SosLoudHint")));
+            Assert.True(page.Shows(Loc.Get("SosWidgetHint")));
+            var loud = page.All<Switch>().Single(s => SemanticProperties.GetDescription(s) == Loc.Get("SosLoud"));
+            Assert.True(loud.IsToggled);
+            loud.IsToggled = false;
+            Assert.False(SharingState.SosLoud);
+        }
+        finally
+        {
+            SharingState.Store = () => null;
+        }
     }
 
     [Fact]

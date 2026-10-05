@@ -154,6 +154,21 @@ public class AppTests : IDisposable
     }
 
     [Fact]
+    public async Task EnlaceDelWidgetAbreLaCuentaAtrasDelSos()
+    {
+        AppState.WelcomeDone = true;
+        var (_, shell) = CreateWindow();
+        App.HandleDeepLink("familytogether://sos");
+        await UiDriver.Until(() => shell.Navigation.NavigationStack.LastOrDefault() is SosPage, "SOS");
+        var depth = shell.Navigation.NavigationStack.Count;
+
+        // Otro toque con la cuenta atras ya en pantalla no abre una segunda.
+        App.HandleDeepLink("familytogether://sos");
+        await UiDriver.Settle(150);
+        Assert.Equal(depth, shell.Navigation.NavigationStack.Count);
+    }
+
+    [Fact]
     public async Task EnlacesRarosNoRompenNada()
     {
         AppState.WelcomeDone = false;
@@ -163,6 +178,7 @@ public class AppTests : IDisposable
         Assert.Equal("ABCD2345", App.PendingJoinCode);
         App.HandleDeepLink("no es una uri");
         App.HandleDeepLink("familytogether://event?type=sos");     // sin bienvenida: nada
+        App.HandleDeepLink("familytogether://sos");                // sin bienvenida: nada
         App.HandleDeepLink("familytogether://otra");
         await UiDriver.Settle(50);
     }

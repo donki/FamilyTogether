@@ -3,13 +3,14 @@ using FamilyTogether.Mobile.Controls;
 using FamilyTogether.Mobile.Helpers;
 using FamilyTogether.Mobile.Localization;
 using FamilyTogether.Mobile.Services;
+using FamilyTogether.Mobile.Services.Native;
 
 namespace FamilyTogether.Mobile.Pages;
 
 /// <summary>
 /// Ajustes: idioma (Sistema, Español, English, con su bandera dibujada), mi nombre y avatar en todos
 /// mis grupos, la cuenta (vinculada o no, vincular Google o Microsoft y recuperar la cuenta en este
-/// movil: HU8, FR-003), el historial (ajustar los recorridos a calles y caminos, borrar el mio), el
+/// movil: HU8, FR-003), el SOS (alarma aunque este en silencio, widget), el historial (ajustar los recorridos a calles y caminos, borrar el mio), el
 /// estado de permisos y bateria, Novedades y Acerca de.
 /// </summary>
 public sealed class SettingsPage : ContentPage
@@ -102,6 +103,7 @@ public sealed class SettingsPage : ContentPage
                             UiKit.Outline(Loc.Get("RecoverAction"), "ic_recover.png", async (_, _) => await RecoverAsync()),
                         },
                     }),
+                    SosCard(),
                     HistoryCard(),
                     UiKit.Card(new VerticalStackLayout
                     {
@@ -205,6 +207,33 @@ public sealed class SettingsPage : ContentPage
                 }
             });
         }
+    }
+
+    // ------------------------------------------------------------------ SOS
+
+    /// <summary>
+    /// Que el SOS recibido suene como alarma aunque el movil este en silencio (encendido por
+    /// defecto; lo lee el servicio de FCM, por eso va en <see cref="SharingState"/>) y como poner
+    /// el widget del boton SOS.
+    /// </summary>
+    private static View SosCard()
+    {
+        var loud = new Switch { IsToggled = SharingState.SosLoud };
+        loud.Toggled += (_, e) => SharingState.SosLoud = e.Value;
+        SemanticProperties.SetDescription(loud, Loc.Get("SosLoud"));
+
+        return UiKit.Card(new VerticalStackLayout
+        {
+            Spacing = 10,
+            Children =
+            {
+                UiKit.Title(Loc.Get("SosSettingsTitle")),
+                UiKit.Row(UiKit.Body(Loc.Get("SosLoud")), loud),
+                UiKit.Hint(Loc.Get("SosLoudHint")),
+                UiKit.Separator(),
+                UiKit.Hint(Loc.Get("SosWidgetHint")),
+            },
+        });
     }
 
     // ------------------------------------------------------------------ historial

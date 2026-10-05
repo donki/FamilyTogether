@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget SOS: un boton redondo. Al tocarlo abre la cuenta atras de 3 s con Cancelar (SosWidget.cs). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent"
+             android:padding="4dp">
+  <TextView android:id="@+id/sos_button"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:background="@drawable/sos_widget_bg"
+            android:gravity="center"
+            android:text="SOS"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:contentDescription="@string/sos_widget_description" />
+</FrameLayout>

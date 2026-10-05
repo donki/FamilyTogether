@@ -259,6 +259,10 @@ internal static class Strings
         ["ClearHistoryHint"] = "Borra tus recorridos en todos tus grupos, también los que aún no se han enviado. Tus grupos seguirán viendo tu última posición en el mapa.",
         ["ClearHistoryConfirm"] = "Se borrarán todos tus recorridos en todos tus grupos, también los que aún no se han enviado. Tus grupos seguirán viendo tu última posición en el mapa. No se puede deshacer.",
         ["ClearHistoryDone"] = "Tu historial se ha borrado ({0} posiciones).",
+        ["SosSettingsTitle"] = "SOS",
+        ["SosLoud"] = "Sonar aunque el móvil esté en silencio",
+        ["SosLoudHint"] = "Cuando llega un SOS de tu grupo suena la alarma a todo volumen durante un minuto, aunque el móvil esté en silencio o en vibración. Para pararla, toca Silenciar en el aviso o abre la app.",
+        ["SosWidgetHint"] = "Puedes poner el botón SOS en la pantalla de inicio: mantén pulsado un hueco libre, toca Widgets y elige Family Together. Al tocarlo se abre la cuenta atrás de 3 segundos, con Cancelar.",
         ["HistoryTitle"] = "Historial",
 
         // ---------------------------------------------------------------- ajustes
@@ -319,6 +323,10 @@ internal static class Strings
         ["ServiceNotifTitle"] = "Compartiendo tu ubicación",
         ["ServiceNotifText"] = "Tus grupos ven tu última posición. Puedes pausar cada grupo desde la app.",
         ["ChannelSos"] = "SOS",
+        ["ChannelSosAlarm"] = "SOS con alarma",
+        ["SosAlarmRinging"] = "Alarma SOS sonando",
+        ["SosAlarmRingingText"] = "Toca Silenciar para pararla.",
+        ["SosAlarmSilence"] = "Silenciar",
         ["ChannelZones"] = "Zonas",
         ["ChannelRequests"] = "Solicitudes",
         ["ChannelService"] = "Compartir ubicación",
@@ -618,6 +626,10 @@ internal static class Strings
         ["ClearHistoryHint"] = "Deletes your routes in all your groups, including those not sent yet. Your groups will still see your last position on the map.",
         ["ClearHistoryConfirm"] = "All your routes in all your groups will be deleted, including those not sent yet. Your groups will still see your last position on the map. This cannot be undone.",
         ["ClearHistoryDone"] = "Your history has been deleted ({0} positions).",
+        ["SosSettingsTitle"] = "SOS",
+        ["SosLoud"] = "Ring even when the phone is on silent",
+        ["SosLoudHint"] = "When an SOS arrives from your group, the alarm rings at full volume for one minute, even if the phone is on silent or vibrate. To stop it, tap Silence on the notification or open the app.",
+        ["SosWidgetHint"] = "You can put the SOS button on your home screen: touch and hold an empty spot, tap Widgets and choose Family Together. Tapping it opens the 3-second countdown, with Cancel.",
         ["HistoryTitle"] = "History",
 
         // ---------------------------------------------------------------- settings
@@ -678,6 +690,10 @@ internal static class Strings
         ["ServiceNotifTitle"] = "Sharing your location",
         ["ServiceNotifText"] = "Your groups see your last position. You can pause each group from the app.",
         ["ChannelSos"] = "SOS",
+        ["ChannelSosAlarm"] = "SOS with alarm",
+        ["SosAlarmRinging"] = "SOS alarm ringing",
+        ["SosAlarmRingingText"] = "Tap Silence to stop it.",
+        ["SosAlarmSilence"] = "Silence",
         ["ChannelZones"] = "Zones",
         ["ChannelRequests"] = "Requests",
         ["ChannelService"] = "Location sharing",

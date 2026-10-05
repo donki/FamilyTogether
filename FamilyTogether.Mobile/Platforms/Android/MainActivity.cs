@@ -50,6 +50,14 @@ public class MainActivity : MauiAppCompatActivity
         LocationSharing.ResumeIfEnabled();
     }
 
+    /// <summary>Abrir la app (también tocando el aviso SOS) para la alarma: el SOS ya se ha visto.</summary>
+    protected override void OnResume()
+    {
+        base.OnResume();
+        if (SosAlarm.IsRinging)
+            SosAlarm.Stop(this);
+    }
+
     /// <summary>
     /// La app ya estaba abierta y llega otro enlace (QR escaneado con la app detrás, aviso
     /// tocado). Con <c>SingleTop</c> no se vuelve a pasar por <c>OnCreate</c>.

@@ -6,7 +6,7 @@
     el «atras predictivo» y el boton de atras deja de llegar al Shell y a las paginas; la app se
     cerraria desde cualquier pantalla. Hasta que MAUI lo soporte, se desactiva aqui.
 
-    Las actividades, el servicio de ubicacion, el de FCM y los receptores los declara el compilador
+    Las actividades, el servicio de ubicacion, el de FCM, el de la alarma SOS, el widget SOS y los receptores los declara el compilador
     a partir de sus atributos [Activity], [Service] y [BroadcastReceiver] (ver cada .cs).
   -->
   <application android:allowBackup="false"
@@ -102,6 +102,14 @@
     pantalla apagada. No se mantiene la CPU despierta de forma continua (bateria, SC-005).
   -->
   <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!--
+    VIBRATE: la alarma de un SOS recibido vibra junto con el sonido (SosAlarm.cs, ajuste «Sonar
+    aunque el movil este en silencio»). Permiso normal, sin dialogo.
+    La alarma la mantiene viva un servicio en primer plano de tipo shortService (SosAlarmService):
+    ese tipo no lleva permiso FOREGROUND_SERVICE_* propio ni declaracion en Play.
+  -->
+  <uses-permission android:name="android.permission.VIBRATE" />
 
   <!--
     No se declaran: USE_FULL_SCREEN_INTENT (el SOS es una notificacion de alta prioridad, no una

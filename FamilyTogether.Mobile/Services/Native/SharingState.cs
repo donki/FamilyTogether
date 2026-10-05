@@ -57,6 +57,27 @@ public static class SharingState
         }
     }
 
+    private const string KeySosLoud = "sos_loud";
+
+    /// <summary>
+    /// Un SOS recibido suena como alarma aunque el móvil esté en silencio o en vibración (ajuste
+    /// del usuario, encendido por defecto). Va aquí y no en <c>Preferences</c> porque lo lee el
+    /// servicio de FCM con la app cerrada.
+    /// </summary>
+    public static bool SosLoud
+    {
+        get
+        {
+            try { return Prefs?.GetBool(KeySosLoud, true) ?? true; }
+            catch { return true; }
+        }
+        set
+        {
+            try { Prefs?.Apply(new Dictionary<string, object?> { [KeySosLoud] = value }); }
+            catch (Exception ex) { NativeLog.Warn("No se pudo guardar el ajuste de la alarma SOS.", ex); }
+        }
+    }
+
     /// <summary>Última posición puesta en la cola, para el umbral de 25 m entre envíos.</summary>
     public static (double Lat, double Lon)? LastSent
     {

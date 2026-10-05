@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.10.05.00",
+    "date": "2026-10-05",
+    "es": [
+      "Widget SOS para la pantalla de inicio: un botón rojo que abre la cuenta atrás de 3 segundos, con Cancelar.",
+      "Nuevo ajuste «Sonar aunque el móvil esté en silencio» (en Ajustes › SOS, encendido): cuando llega un SOS de tu grupo suena la alarma a todo volumen durante un minuto. Se para con Silenciar o abriendo la app."
+    ],
+    "en": [
+      "SOS widget for your home screen: a red button that opens the 3-second countdown, with Cancel.",
+      "New setting \"Ring even when the phone is on silent\" (Settings › SOS, on): when an SOS arrives from your group the alarm rings at full volume for one minute. Stop it with Silence or by opening the app."
+    ]
+  },
+  {
     "version": "2026.10.03.00",
     "date": "2026-10-03",
     "es": [

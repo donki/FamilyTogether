@@ -12,7 +12,7 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 
 /// <inheritdoc cref="INotifier"/>
 /// <remarks>
-/// <para>Cuatro canales separados (Mobile §10), para que el usuario pueda silenciar uno sin perder
+/// <para>Cinco canales separados (Mobile §10), para que el usuario pueda silenciar uno sin perder
 /// los demás:</para>
 /// <list type="bullet">
 /// <item><c>sos</c>: importancia alta, sonido de alarma y vibración. Saltarse «No molestar» no lo
@@ -21,6 +21,9 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// Ajustes > Notificaciones > SOS > «Ignorar No molestar». Se marca igualmente al crear el canal,
 /// por si el sistema lo respeta, y el aviso lleva la categoría de alarma, que muchos perfiles de
 /// No molestar dejan pasar.</item>
+/// <item><c>sos_alarm</c>: el SOS cuando suena la alarma de la app (<see cref="SosAlarm"/>, ajuste
+/// «Sonar aunque esté en silencio»): importancia alta sin sonido ni vibración propios, con
+/// «Silenciar»; descartarlo también para la alarma.</item>
 /// <item><c>zones</c>: entradas y salidas de zonas, importancia normal.</item>
 /// <item><c>requests</c>: solicitudes para unirse y su resolución, importancia normal.</item>
 /// <item><c>service</c>: la notificación fija del servicio de ubicación, importancia baja (sin
@@ -35,6 +38,7 @@ public sealed class Notifier : INotifier
     private const string ChannelZones = NotificationRules.ChannelZones;
     private const string ChannelRequests = NotificationRules.ChannelRequests;
     private const string ChannelService = NotificationRules.ChannelService;
+    private const string ChannelSosAlarm = NotificationRules.ChannelSosAlarm;
 
     private static readonly long[] SosVibration = [0, 600, 250, 600, 250, 600];
 
@@ -83,6 +87,12 @@ public sealed class Notifier : INotifier
             var id = NotificationRules.NotificationIdFor(content.EventId);
             var isSos = channel == ChannelSos;
 
+            // Con «Sonar aunque esté en silencio», suena la alarma de la app y el aviso va por el
+            // canal sin sonido propio, para que no se pisen. Si la alarma no arranca, canal normal.
+            var loud = isSos && SharingState.SosLoud && SosAlarm.Start(context);
+            if (loud)
+                channel = ChannelSosAlarm;
+
             // Cada Set* del binding devuelve un Builder anulable: se llama sobre la misma variable.
             var builder = new NotificationCompat.Builder(context, channel);
             builder.SetSmallIcon(Resource.Drawable.ic_notification);
@@ -100,7 +110,13 @@ public sealed class Notifier : INotifier
                 : channel == ChannelZones ? NotificationCompat.CategoryStatus
                 : NotificationCompat.CategorySocial);
 
-            if (isSos)
+            if (loud)
+            {
+                var silence = SosAlarm.SilenceIntent(context);
+                builder.AddAction(0, Text("SosAlarmSilence", "Silence"), silence);
+                builder.SetDeleteIntent(silence);
+            }
+            else if (isSos)
             {
                 // Antes de Android 8 no hay canales: sonido y vibración van en el propio aviso.
                 builder.SetVibrate(SosVibration);
@@ -134,7 +150,7 @@ public sealed class Notifier : INotifier
     }
 
     /// <summary>
-    /// Crea (o actualiza el nombre de) los cuatro canales. Idempotente: Android solo cambia el
+    /// Crea (o actualiza el nombre de) los cinco canales. Idempotente: Android solo cambia el
     /// nombre y la descripción de un canal existente; sonido, importancia y demás los manda ya el
     /// usuario.
     /// </summary>
@@ -161,6 +177,15 @@ public sealed class Notifier : INotifier
                 .Build();
             sos.SetSound(RingtoneManager.GetDefaultUri(RingtoneType.Alarm), alarmAttributes);
 
+            // El SOS cuando suena la alarma de la app (SosAlarm): emergente y en la pantalla de
+            // bloqueo, pero sin sonido ni vibración propios (los pone la alarma).
+            var sosAlarm = new NotificationChannel(ChannelSosAlarm, Text("ChannelSosAlarm", "SOS with alarm"), NotificationImportance.High);
+            sosAlarm.EnableVibration(false);
+            sosAlarm.SetSound(null, null);
+            sosAlarm.EnableLights(true);
+            sosAlarm.LockscreenVisibility = NotificationVisibility.Public;
+            sosAlarm.SetBypassDnd(true);
+
             var zones = new NotificationChannel(ChannelZones, Text("ChannelZones", "Zones"), NotificationImportance.Default);
             var requests = new NotificationChannel(ChannelRequests, Text("ChannelRequests", "Requests"), NotificationImportance.Default);
 
@@ -169,7 +194,7 @@ public sealed class Notifier : INotifier
             service.EnableVibration(false);
             service.SetSound(null, null);
 
-            manager.CreateNotificationChannels([sos, zones, requests, service]);
+            manager.CreateNotificationChannels([sos, sosAlarm, zones, requests, service]);
         }
         catch (Exception ex)
         {

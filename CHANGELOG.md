@@ -1,5 +1,18 @@
 # Changelog — Family Together
 
+## 2026.10.05.00
+
+- **Widget SOS** (`SosWidget`, 1x1): círculo rojo en la pantalla de inicio que abre la app con
+  `familytogether://sos`: el mapa y encima la misma cuenta atrás de 3 s con Cancelar del botón del
+  mapa. Nunca envía nada sin esa cuenta atrás.
+- **Alarma SOS aunque el móvil esté en silencio** (Ajustes › SOS, encendido por defecto,
+  `SharingState.SosLoud`): al llegar un SOS, la app reproduce el tono de alarma por el flujo de
+  alarma (que el silencio y la vibración no callan) con el volumen de alarma al máximo durante un
+  minuto, y vibra. Se para con «Silenciar» (en el aviso o en la notificación fija), descartando el
+  aviso o abriendo la app; el volumen vuelve a como estaba. El aviso va por un canal nuevo
+  `sos_alarm` sin sonido propio, y un servicio `shortService` mantiene vivo el proceso mientras
+  suena (sin permiso ni declaración nueva en Play; solo `VIBRATE`).
+
 ## 2026.10.03.00
 
 - **Pruebas: 90,1 % de toda la app** (antes 33 % con la cuenta antigua; 45,9 % con la nueva, que

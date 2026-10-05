@@ -15,6 +15,18 @@ public static class NotificationRules
     public const string ChannelRequests = "requests";
     public const string ChannelService = "service";
 
+    /// <summary>
+    /// El SOS cuando suena la alarma de la app (<c>SosAlarm</c>): importancia alta pero sin sonido
+    /// ni vibración propios, para que no se pisen con la alarma.
+    /// </summary>
+    public const string ChannelSosAlarm = "sos_alarm";
+
+    /// <summary>Id de la notificación fija mientras suena la alarma SOS.</summary>
+    public const int SosAlarmNotificationId = 4102;
+
+    /// <summary>Enlace del widget: abre la cuenta atrás del SOS.</summary>
+    public const string SosLink = DeepLinkScheme + "://sos";
+
     /// <summary>Id de la notificación fija del servicio; los avisos nunca lo usan.</summary>
     public const int ServiceNotificationId = 4101;
 
@@ -52,7 +64,7 @@ public static class NotificationRules
     public static int NotificationIdFor(Guid eventId)
     {
         var id = eventId.GetHashCode() & 0x7FFFFFFF;
-        return id == ServiceNotificationId ? id + 1 : id;
+        return id is ServiceNotificationId or SosAlarmNotificationId ? id + 2 : id;
     }
 
     /// <summary>

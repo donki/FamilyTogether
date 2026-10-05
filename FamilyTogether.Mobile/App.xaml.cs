@@ -46,7 +46,7 @@ public partial class App : Application
     /// Enlaces propios que entrega <c>MainActivity</c>: el QR de una invitacion
     /// (<c>familytogether://join?c=XXXX</c>) abre la pantalla de unirse con el codigo; un aviso tocado
     /// (<c>familytogether://event?type=…&amp;group=…&amp;event=…</c>) abre su grupo en el mapa, o Grupos
-    /// si es una solicitud.
+    /// si es una solicitud; el widget SOS (<c>familytogether://sos</c>) abre la cuenta atras del SOS.
     /// </summary>
     public static void HandleDeepLink(string uri)
     {
@@ -75,6 +75,13 @@ public partial class App : Application
                     if (AppState.WelcomeDone)
                         _ = shell.GoToAsync("//GroupsPage");
                 }
+                return;
+            }
+
+            if (uri.Host.Equals("sos", StringComparison.OrdinalIgnoreCase))
+            {
+                if (AppState.WelcomeDone)
+                    _ = OpenSosAsync(shell);
                 return;
             }
 
@@ -134,6 +141,27 @@ public partial class App : Application
         catch (Exception ex)
         {
             CrashLog.Error("App.OpenEventAsync", ex);
+        }
+    }
+
+    /// <summary>
+    /// El widget SOS: el mapa y encima la cuenta atras de 3 s con Cancelar, como el boton del mapa
+    /// (un toque sin querer en la pantalla de inicio nunca envia nada solo). Si ya hay una cuenta
+    /// atras en pantalla, no se abre otra.
+    /// </summary>
+    private static async Task OpenSosAsync(AppShell shell)
+    {
+        try
+        {
+            if (shell.Navigation.NavigationStack.LastOrDefault() is Pages.SosPage)
+                return;
+
+            await shell.GoToAsync("//MapPage");
+            await shell.Navigation.PushAsync(new Pages.SosPage());
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Error("App.OpenSosAsync", ex);
         }
     }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos que lee Android sin pasar por la app (el selector de widgets). El resto, en Localization. -->
+<resources>
+  <string name="sos_widget_label">SOS</string>
+  <string name="sos_widget_description">Send an SOS to your groups (3-second countdown, with Cancel)</string>
+</resources>
