@@ -55,7 +55,7 @@ public class HistoryPageTests : IDisposable
         {
             for (var i = 0; i < 4; i++)
                 casa.Positions.Add((Me, 41.401 + i * 0.001, 2.17, 8, _now.AddMinutes(-20 + i * 2), 70));
-            casa.Positions.Add((Me, 41.5, 2.5, 8, _now.AddHours(-50), 70));   // fuera de las 24 h (y de ayer)
+            casa.Positions.Add((Me, 41.5, 2.5, 8, _now.AddDays(-10), 70));   // fuera de las 24 h y de los dias que se eligen (antes -50 h: caia en anteayer por la tarde)
         }
         return casa;
     }

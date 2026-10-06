@@ -24,6 +24,18 @@
     andar desde quieto, el recorrido empieza cuando salta el sensor y fija el GPS (el principio
     guardado de `MotionStartBuffer` ya casi no tiene lecturas, porque quieto no hay GPS).
 
+- **Alarma SOS**: la lógica (cuándo suena, el minuto, el volumen de alarma al máximo y devolverlo, que
+  un fallo del sistema no rompa el aviso) pasa de `Platforms\Android\SosAlarm.cs` a
+  `Services\Native\SosAlarmLogic.cs`, con 7 pruebas; en Android queda solo el aparato
+  (`AndroidAlarmDevice`).
+- **Pruebas**: `HistoryPageTests.UnDiaConcreto` fallaba según la hora del día (una posición de hace
+  50 h caía en «anteayer» por la tarde); ahora está a 10 días. 515 pruebas, todas pasan.
+- **Cobertura de toda la app: 88,1 %** (antes 90,1 %). **Baja** porque el ahorro de batería está casi
+  todo en el servicio de ubicación de Android (`LocationSharingForegroundService`, +125 líneas que el
+  banco no compila) y por el widget y el aviso SOS de la 2026.10.05.00. Plan para volver al 90 % en
+  `09-TAREAS-FamilyTogether.md`: sacar a `Services\Native` qué pide el servicio en cada modo (GPS,
+  red, pasiva, alarma de quieto) y la elección de canal del aviso, como ya está `LocationPlan`.
+
 ## 2026.10.05.00
 
 - **Widget SOS** (`SosWidget`, 1x1): círculo rojo en la pantalla de inicio que abre la app con
