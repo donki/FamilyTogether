@@ -409,6 +409,27 @@ public class MapPageTests : IDisposable
     }
 
     [Fact]
+    public async Task EnSegundoPlanoNoRefrescaNiPreguntaAlMapa()
+    {
+        // MAUI no llama a OnDisappearing al pulsar Inicio y el proceso sigue vivo por el servicio:
+        // el mapa tiene que pararse solo (bateria, SC-005).
+        await CasaAsync();
+        var (_, web, _) = Open();
+        await UntilCall(web, "center(41.39, 2.17, 15)");
+        Assert.True(RefreshTimer().IsRunning);
+
+        Raise("AppStopped");
+        Assert.False(RefreshTimer().IsRunning);
+        Assert.False(EventTimer().IsRunning);
+
+        var before = GroupRequests;
+        Raise("AppResumed");
+        await UiDriver.Until(() => GroupRequests == before + 1, "recarga al volver");
+        Assert.True(RefreshTimer().IsRunning);
+        Assert.True(EventTimer().IsRunning);
+    }
+
+    [Fact]
     public async Task AbiertoDesdeUnAvisoVaAlSitioDelEvento()
     {
         await CasaAsync();

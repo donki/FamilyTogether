@@ -128,7 +128,12 @@ public static class PushMessages
         // Otro administrador ha resuelto una solicitud: el aviso «X quiere unirse» (mismo event_id)
         // ya no pinta nada en la barra. Si la solicitud es mía, justo después sale su resolución.
         if (type == EventTypes.RequestResolved)
+        {
             target.Cancel(eventId);
+            // Si era mi solicitud y la han aprobado, hay un grupo nuevo donde compartir: que la
+            // siguiente lectura lo vea ya, sin esperar a que caduque la caché (15 min, batería).
+            SharingState.InvalidateGroups();
+        }
 
         if (feed is null)
             return;

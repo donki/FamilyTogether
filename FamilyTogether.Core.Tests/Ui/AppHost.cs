@@ -24,7 +24,7 @@ internal sealed class AppHost : IDisposable
     {
         UiThread.Inline = true;
         // Paginas de pruebas anteriores que siguen suscritas a los avisos estaticos de la app.
-        foreach (var name in new[] { "AppResumed", "MapFocusRequested" })
+        foreach (var name in new[] { "AppResumed", "MapFocusRequested", "AppStopped" })
             typeof(App).GetField(name, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)?.SetValue(null, null);
         MauiFakes.Preferences.Broken = false;
         MauiFakes.Preferences.Values.Clear();

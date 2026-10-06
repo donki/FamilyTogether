@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.10.06.00",
+    "date": "2026-10-06",
+    "es": [
+      "Gasta mucha menos batería: con el móvil quieto el GPS se apaga y se vuelve a encender en cuanto te mueves, y la app deja de trabajar en segundo plano cuando no la estás mirando.",
+      "Tu grupo te sigue viendo igual: tu posición al moverte, los avisos de zonas y el SOS funcionan como siempre."
+    ],
+    "en": [
+      "Uses much less battery: when your phone is still the GPS turns off, and it turns back on as soon as you move; the app also stops working in the background when you are not looking at it.",
+      "Your group still sees you the same way: your position while moving, zone alerts and SOS work as before."
+    ]
+  },
+  {
     "version": "2026.10.05.00",
     "date": "2026-10-05",
     "es": [

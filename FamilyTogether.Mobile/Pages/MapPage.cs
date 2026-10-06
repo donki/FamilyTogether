@@ -175,6 +175,7 @@ public sealed class MapPage : ContentPage, IBackHandler
         _map.StartEvents();
         App.AppResumed += OnResumed;
         App.MapFocusRequested += OnResumed;
+        App.AppStopped += OnStopped;
         _timer ??= CreateTimer();
         _timer.Start();
         // Al abrir, el mapa se centra en mi posicion (no en el grupo entero): se deja marcado como
@@ -256,6 +257,19 @@ public sealed class MapPage : ContentPage, IBackHandler
         _map.StopEvents();
         App.AppResumed -= OnResumed;
         App.MapFocusRequested -= OnResumed;
+        App.AppStopped -= OnStopped;
+    }
+
+    /// <summary>
+    /// La app se va a segundo plano con el mapa abierto: se paran el refresco y la consulta de
+    /// eventos de la página, que si no seguían con la app cerrada (red cada 30 s y una lectura GPS
+    /// de precisión máxima en cada vuelta: lo que más batería gastaba, SC-005). Al volver,
+    /// <see cref="OnResumed"/> los arranca y recarga.
+    /// </summary>
+    private void OnStopped(object? sender, EventArgs e)
+    {
+        _timer?.Stop();
+        _map.StopEvents();
     }
 
     private IDispatcherTimer CreateTimer()
@@ -270,7 +284,13 @@ public sealed class MapPage : ContentPage, IBackHandler
         return timer;
     }
 
-    private void OnResumed(object? sender, EventArgs e) => UiThread.Post(async () => await LoadAsync(quiet: true));
+    private void OnResumed(object? sender, EventArgs e)
+    {
+        // Solo llega con la página a la vista (se suscribe en OnAppearing): se vuelve a refrescar.
+        _timer?.Start();
+        _map.StartEvents();
+        UiThread.Post(async () => await LoadAsync(quiet: true));
+    }
 
     private async void OnGroupChanged(object? sender, EventArgs e)
     {

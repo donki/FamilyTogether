@@ -1,5 +1,29 @@
 # Changelog — Family Together
 
+## 2026.10.06.00
+
+- **Batería: objetivo SC-005 (< 5 % en 24 h).** Lo que más gastaba, de mayor a menor:
+  - **El mapa seguía vivo con la app en segundo plano**: MAUI no llama a `OnDisappearing` al pulsar
+    Inicio y el proceso no muere (lo mantiene el servicio de ubicación), así que el Mapa seguía
+    refrescando cada 30 s (varias peticiones al servidor y una lectura GPS de precisión máxima de
+    hasta 10 s) y preguntando a la página cada 400 ms. Ahora se para con `Window.Stopped`
+    (`App.AppStopped`) y vuelve con `AppResumed`.
+  - **El GPS pedido las 24 h**: el `minDistance = 25 m` solo filtra lo que se entrega; el chip seguía
+    encendido y en casa buscando satélites sin parar. Nuevo `LocationPlan`: **moviéndose**, GPS y red
+    cada 30 s como antes; **quieto** (sensor de movimiento significativo sin saltar en 5 min, sin
+    velocidad de GPS y pasados 5 min desde el arranque), **GPS apagado**, red cada 5 min y la pasiva.
+    El sensor (o una lectura GPS con velocidad, también de otras apps por la pasiva) lo vuelve a
+    encender al momento; una alarma de `AlarmManager` comprueba el paso a quieto aunque la CPU duerma.
+    Sin ese sensor, todo como antes.
+  - **La radio cada minuto**: cada lectura aproximada refrescaba los grupos si la caché tenía más de
+    60 s (ahora 15 min; las aprobaciones por push la invalidan); con FCM, el ciclo iba al servidor
+    cada 5 min (grupos y claves pedidas): ahora una sola vuelta cada 30 min que, además, recoge los
+    eventos que un push perdiera. Lo pendiente (cola, zonas, SOS) se sigue reintentando cada 60 s y
+    sin nada pendiente el ciclo no toca la red. La poda del recorrido local, cada 30 min.
+  - SOS, avisos de zona y la posición al moverse no cambian (SC-002/003/004, FR-009/010). Al echar a
+    andar desde quieto, el recorrido empieza cuando salta el sensor y fija el GPS (el principio
+    guardado de `MotionStartBuffer` ya casi no tiene lecturas, porque quieto no hay GPS).
+
 ## 2026.10.05.00
 
 - **Widget SOS** (`SosWidget`, 1x1): círculo rojo en la pantalla de inicio que abre la app con

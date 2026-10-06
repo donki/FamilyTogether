@@ -38,6 +38,12 @@ public interface ISharingDevice
     /// <summary>Los avisos del sistema si el contenedor no los da.</summary>
     INotifier FallbackNotifier();
 
+    /// <summary>
+    /// Cambia lo que se pide al sistema según el modo (<see cref="LocationPlan"/>): con el móvil
+    /// quieto, sin GPS. Puede llamarse desde cualquier hilo.
+    /// </summary>
+    void ApplyTracking(TrackingMode mode);
+
     /// <summary>Coge la CPU (con tiempo máximo) mientras se procesa.</summary>
     void AcquireWakeLock();
 
@@ -58,8 +64,14 @@ public interface ISharingDevice
 /// se calculan los grupos donde comparto en ese momento, se encola en <see cref="LocationOutbox"/>
 /// con su hora original, se vacía la cola si hay red, y se evalúan las zonas
 /// (<see cref="ZoneWatcher"/>) informando de cada entrada o salida.</para>
-/// <para><b>Cada 60 s</b>: se reintenta lo que quedó pendiente (cola, zonas, SOS), se entregan las
-/// claves que alguien haya pedido y, si no hay FCM, se consultan los eventos nuevos y se avisa.</para>
+/// <para><b>Cada 60 s</b>: se reintenta lo que quedó pendiente (cola, zonas, SOS); eso solo mira la
+/// base local y no toca la red si no hay nada. Lo que sí pregunta al servidor (grupos, claves
+/// pedidas, eventos) va junto en una sola vuelta: cada 60 s sin FCM, como antes, y con FCM cada
+/// <see cref="ServerCheckEveryWithPush"/>, de respaldo por si se perdió algún push (2026-10-06:
+/// antes, con FCM, la red se despertaba cada 5 min para nada).</para>
+/// <para><b>Quieto o moviéndose</b> (<see cref="LocationPlan"/>, 2026-10-06): el motor decide el
+/// modo con el sensor de movimiento, la velocidad del GPS y la hora de arranque, y se lo pide al
+/// dispositivo (<see cref="ISharingDevice.ApplyTracking"/>): con el móvil quieto, el GPS apagado.</para>
 /// <para><b>Nunca tumba el proceso</b>: cada paso va con su try/catch y se registra.</para>
 /// </remarks>
 public sealed class SharingEngine(ISharingDevice device)
@@ -73,14 +85,29 @@ public sealed class SharingEngine(ISharingDevice device)
     /// <summary>Una lectura más vieja que esto (una «última conocida» recalentada) no se envía.</summary>
     public static readonly TimeSpan MaxReadingAge = TimeSpan.FromMinutes(2);
 
-    /// <summary>Con FCM las claves pedidas llegan por push; aun así se mira de vez en cuando.</summary>
-    public static readonly TimeSpan KeySharesEveryWithPush = TimeSpan.FromMinutes(5);
+    /// <summary>
+    /// Con FCM, cada cuánto se pregunta igualmente al servidor (grupos, claves pedidas, eventos),
+    /// por si se perdió algún push. Todo en la misma vuelta: la radio se despierta una vez, no tres.
+    /// </summary>
+    public static readonly TimeSpan ServerCheckEveryWithPush = TimeSpan.FromMinutes(30);
 
-    /// <summary>Antigüedad máxima de la caché de grupos al procesar una lectura (pausas recientes).</summary>
-    public static readonly TimeSpan GroupsMaxAgeOnReading = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// Antigüedad máxima de la caché de grupos al procesar una lectura. Era de 60 s y cada lectura
+    /// aproximada (la red, con el móvil quieto) acababa preguntando al servidor por los grupos y sus
+    /// miembros: la radio despierta casi cada minuto. Las pausas, entradas y salidas hechas en este
+    /// móvil ya invalidan la caché al momento (<c>SharingChanges</c>) y las aprobaciones que llegan
+    /// por push también (<c>PushMessages</c>); el fin de una pausa se evalúa con su hora, sin red.
+    /// </summary>
+    public static readonly TimeSpan GroupsMaxAgeOnReading = TimeSpan.FromMinutes(15);
 
-    /// <summary>Antigüedad máxima de la caché de grupos en el ciclo periódico.</summary>
-    public static readonly TimeSpan GroupsMaxAgeOnCycle = TimeSpan.FromMinutes(5);
+    /// <summary>
+    /// Antigüedad máxima de la caché de grupos en la vuelta al servidor del ciclo (un poco menos que
+    /// <see cref="ServerCheckEveryWithPush"/>, para que en esa vuelta siempre se refresque).
+    /// </summary>
+    public static readonly TimeSpan GroupsMaxAgeOnCycle = TimeSpan.FromMinutes(25);
+
+    /// <summary>Cada cuánto se poda el recorrido local (antes, en cada vuelta: una escritura por minuto).</summary>
+    public static readonly TimeSpan PruneEvery = TimeSpan.FromMinutes(30);
 
     /// <summary>Tope de entradas y salidas de zona pendientes de informar.</summary>
     public const int MaxPendingZoneEvents = 50;
@@ -92,11 +119,68 @@ public sealed class SharingEngine(ISharingDevice device)
     private readonly List<(Guid Group, Guid Zone, string Kind)> _pendingZoneEvents = [];
     private readonly MotionStartBuffer _stillReadings = new();
     private bool _sentInThisRun;
-    private DateTimeOffset _lastKeyShares = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastServerCheck = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastPrune = DateTimeOffset.MinValue;
     private DateTimeOffset _lastStillLog = DateTimeOffset.MinValue;
+    private DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
+    private DateTimeOffset? _lastFastGps;
+    private readonly object _modeLock = new();
 
     /// <summary>El servicio está vivo: si no, lo que llega se ignora.</summary>
     public bool Running { get; set; }
+
+    /// <summary>Modo actual de escucha (<see cref="LocationPlan"/>).</summary>
+    public TrackingMode Mode { get; private set; } = TrackingMode.Moving;
+
+    /// <summary>Cuándo pasaría a quieto si no pasa nada más (el servicio programa ahí una comprobación).</summary>
+    public DateTimeOffset StillAt
+    {
+        get { lock (_modeLock) return LocationPlan.StillAt(device.LastMotion, _lastFastGps, _startedAt); }
+    }
+
+    /// <summary>
+    /// El servicio empieza a escuchar: se arranca moviéndose (con GPS) para que el grupo vea una
+    /// posición buena cuanto antes (SC-002); si en <see cref="LocationPlan.StillAfter"/> nada dice
+    /// que se mueve, pasa a quieto. Lo del modo inicial lo pide al sistema el propio servicio.
+    /// </summary>
+    public void BeginTracking(DateTimeOffset now)
+    {
+        lock (_modeLock)
+        {
+            _startedAt = now;
+            _lastFastGps = null;
+            Mode = TrackingMode.Moving;
+        }
+    }
+
+    /// <summary>
+    /// Recalcula el modo y, si cambia, se lo pide al dispositivo. Lo llaman cada lectura, el sensor
+    /// de movimiento, el ciclo y la alarma del servicio.
+    /// </summary>
+    public TrackingMode UpdateTracking(DateTimeOffset now)
+    {
+        TrackingMode mode;
+        lock (_modeLock)
+        {
+            mode = LocationPlan.ModeFor(device.MotionAvailable, device.LastMotion, _lastFastGps, _startedAt, now);
+            if (mode == Mode || !Running)
+                return Mode;
+            Mode = mode;
+        }
+
+        NativeLog.Info(mode == TrackingMode.Still
+            ? "Móvil quieto: GPS apagado, solo la red de vez en cuando."
+            : "Móvil en movimiento: GPS encendido.");
+        try
+        {
+            device.ApplyTracking(mode);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Error("No se pudo cambiar el modo de escucha de la ubicación.", ex);
+        }
+        return mode;
+    }
 
     /// <summary>Entradas y salidas de zona aún sin informar (se reintentan en el ciclo).</summary>
     public int PendingZoneEvents
@@ -154,6 +238,16 @@ public sealed class SharingEngine(ISharingDevice device)
             // Filtro rápido fuera del cerrojo; se repite dentro por si entró otra mientras tanto.
             if (location.Accuracy is not { } accuracy || accuracy > LocationOutbox.CoarseMaxAccuracyMeters)
                 return;
+
+            // El GPS mide velocidad de ir andando o más (también lo que llega por la pasiva, de
+            // otras apps): se mueve, aunque el sensor no haya saltado. Se enciende o sigue el GPS.
+            if (string.Equals(location.Provider, GpsProvider, StringComparison.OrdinalIgnoreCase) &&
+                location.Speed is >= ReadingPolicy.MovingSpeed && DateTimeOffset.UtcNow - location.At <= MaxReadingAge)
+            {
+                lock (_modeLock)
+                    _lastFastGps = location.At;
+            }
+            UpdateTracking(DateTimeOffset.UtcNow);
 
             await _work.WaitAsync().ConfigureAwait(false);
             try
@@ -358,6 +452,9 @@ public sealed class SharingEngine(ISharingDevice device)
             if (!Running)
                 return;
 
+            // Quieto desde hace un rato: fuera el GPS (si la alarma del servicio no lo hizo ya).
+            UpdateTracking(DateTimeOffset.UtcNow);
+
             // Si todavía se está procesando una lectura, esta vuelta se salta: habrá otra en 60 s.
             if (!await _work.WaitAsync(0).ConfigureAwait(false))
                 return;
@@ -381,15 +478,22 @@ public sealed class SharingEngine(ISharingDevice device)
 
     private async Task CycleAsync()
     {
-        // Lo de más de 24 h del recorrido local se borra también sin red.
-        try
+        var now = DateTimeOffset.UtcNow;
+
+        // Lo de más de 24 h del recorrido local se borra también sin red (cada media hora basta:
+        // al consultar se poda igualmente).
+        if (now - _lastPrune >= PruneEvery)
         {
-            if (device.Get<LocalTrack>() is { } track)
-                await track.PruneAsync().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            NativeLog.Warn("No se pudo podar el recorrido local.", ex);
+            _lastPrune = now;
+            try
+            {
+                if (device.Get<LocalTrack>() is { } track)
+                    await track.PruneAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                NativeLog.Warn("No se pudo podar el recorrido local.", ex);
+            }
         }
 
         if (!device.IsOnline())
@@ -398,9 +502,6 @@ public sealed class SharingEngine(ISharingDevice device)
         var family = device.Get<FamilyService>();
         if (family is null)
             return;
-
-        // Mantiene al día la caché de grupos (fin de pausas, grupos nuevos, expulsiones).
-        await SharingState.GetSharingGroupsAsync(family, online: true, GroupsMaxAgeOnCycle).ConfigureAwait(false);
 
         // 1. Posiciones que se quedaron sin enviar.
         var outbox = device.Get<LocationOutbox>();
@@ -435,24 +536,29 @@ public sealed class SharingEngine(ISharingDevice device)
             }
         }
 
-        var push = device.PushConfigured;
+        // Lo de arriba solo toca la red si había algo pendiente. Lo de abajo pregunta al servidor:
+        // sin FCM en cada vuelta (es la única forma de enterarse, ARQUITECTURA §7); con FCM, todo
+        // junto cada media hora, de respaldo.
+        if (device.PushConfigured && now - _lastServerCheck < ServerCheckEveryWithPush)
+            return;
+        _lastServerCheck = now;
 
-        // 4. Claves pedidas por quien ha recuperado su cuenta (ARQUITECTURA §5).
-        if (!push || DateTimeOffset.UtcNow - _lastKeyShares > KeySharesEveryWithPush)
+        // 4. Mantiene al día la caché de grupos (fin de pausas, grupos nuevos, expulsiones).
+        await SharingState.GetSharingGroupsAsync(family, online: true, GroupsMaxAgeOnCycle).ConfigureAwait(false);
+
+        // 5. Claves pedidas por quien ha recuperado su cuenta (ARQUITECTURA §5).
+        try
         {
-            try
-            {
-                await family.FulfillPendingKeySharesAsync().ConfigureAwait(false);
-                _lastKeyShares = DateTimeOffset.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                NativeLog.Warn("No se pudieron entregar las claves pedidas.", ex);
-            }
+            await family.FulfillPendingKeySharesAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudieron entregar las claves pedidas.", ex);
         }
 
-        // 5. Sin FCM, los avisos salen de aquí (ARQUITECTURA §7).
-        if (!push && device.Get<EventFeed>() is { } feed)
+        // 6. Los eventos nuevos: sin FCM, los avisos salen de aquí; con FCM, recoge los que se
+        // perdieran (el push falló o llegó sin red). Los ya avisados no se repiten (EventFeed).
+        if (device.Get<EventFeed>() is { } feed)
         {
             try
             {

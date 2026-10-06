@@ -15,6 +15,14 @@ public partial class App : Application
     /// <summary>La app vuelve a primer plano: las pantallas con datos vivos se refrescan.</summary>
     public static event EventHandler? AppResumed;
 
+    /// <summary>
+    /// La app pasa a segundo plano (Inicio, otra app, pantalla apagada). MAUI no llama a
+    /// <c>OnDisappearing</c> en ese caso y el proceso sigue vivo por el servicio de ubicación: sin
+    /// este aviso, el mapa seguía refrescando cada 30 s (red y una lectura GPS de precisión máxima)
+    /// y preguntando a la página cada 400 ms con la app cerrada (batería, SC-005, 2026-10-06).
+    /// </summary>
+    public static event EventHandler? AppStopped;
+
     public App()
     {
         InitializeComponent();
@@ -38,6 +46,7 @@ public partial class App : Application
             _ = AppChores.RunAsync();
             AppResumed?.Invoke(this, EventArgs.Empty);
         };
+        window.Stopped += (_, _) => AppStopped?.Invoke(this, EventArgs.Empty);
 
         return window;
     }

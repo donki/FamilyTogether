@@ -59,6 +59,13 @@ internal sealed class FakeDevice(IServiceProvider services) : ISharingDevice
     public bool BrokenWakeLock { get; set; }
     public void AcquireWakeLock() { if (BrokenWakeLock) throw new InvalidOperationException("sin bloqueo"); WakeLocks++; }
     public void ReleaseWakeLock() => Releases++;
+    public List<TrackingMode> Applied { get; } = [];
+    public bool BrokenTracking { get; set; }
+    public void ApplyTracking(TrackingMode mode)
+    {
+        if (BrokenTracking) throw new InvalidOperationException("sin LocationManager");
+        Applied.Add(mode);
+    }
 }
 
 /// <summary>La logica de la parte nativa sacada de Platforms\Android (Services\Native).</summary>
@@ -401,6 +408,199 @@ public class NativeTests : IDisposable
         engine.Running = false;
         await engine.PromoteStillReadingsAsync(t);
         engine.ClearStillReadings();
+    }
+
+    // -----------------------------------------------------------------------
+    // Bateria: quieto o moviendose (LocationPlan, 2026-10-06)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Plan_SinSensorSiempreMoviendose()
+    {
+        var start = Now.AddHours(-3);
+        Assert.Equal(TrackingMode.Moving, LocationPlan.ModeFor(false, null, null, start, Now));
+        Assert.Equal(TrackingMode.Moving, LocationPlan.ModeFor(false, Now.AddHours(-2), null, start, Now));
+    }
+
+    [Fact]
+    public void Plan_QuietoTrasCincoMinutosSinMovimientoNiVelocidad()
+    {
+        var start = Now.AddHours(-1);
+        // Recien arrancado: moviendose (la primera posicion buena sale con el GPS).
+        Assert.Equal(TrackingMode.Moving, LocationPlan.ModeFor(true, null, null, Now.AddMinutes(-4), Now));
+        Assert.Equal(TrackingMode.Still, LocationPlan.ModeFor(true, null, null, start, Now));
+        Assert.Equal(TrackingMode.Still, LocationPlan.ModeFor(true, Now.AddMinutes(-5), null, start, Now));
+        Assert.Equal(TrackingMode.Moving, LocationPlan.ModeFor(true, Now.AddMinutes(-4), null, start, Now));
+        Assert.Equal(TrackingMode.Moving, LocationPlan.ModeFor(true, Now.AddMinutes(-30), Now.AddMinutes(-1), start, Now));
+        Assert.Equal(LocationPlan.StillAfter, ReadingPolicy.MotionWindow);
+
+        Assert.Equal(start + LocationPlan.StillAfter, LocationPlan.StillAt(null, null, start));
+        Assert.Equal(Now.AddMinutes(-1) + LocationPlan.StillAfter, LocationPlan.StillAt(Now.AddMinutes(-20), Now.AddMinutes(-1), start));
+        Assert.Equal(Now.AddMinutes(-2) + LocationPlan.StillAfter, LocationPlan.StillAt(Now.AddMinutes(-2), Now.AddMinutes(-9), start));
+    }
+
+    [Fact]
+    public void Plan_QuietoSinGpsYLaRedCadaCincoMinutos()
+    {
+        var all = new[] { "gps", "network", "passive", "fused" };
+
+        var moving = LocationPlan.Requests(TrackingMode.Moving, all);
+        Assert.Equal(["gps", "network"], moving.Select(r => r.Provider));
+        Assert.All(moving, r => Assert.Equal(TimeSpan.FromSeconds(30), r.MinTime));
+        Assert.All(moving, r => Assert.Equal(25f, r.MinDistanceMeters));
+
+        var still = LocationPlan.Requests(TrackingMode.Still, all);
+        Assert.DoesNotContain(still, r => r.Provider == "gps");
+        Assert.Equal(TimeSpan.FromMinutes(5), still.Single(r => r.Provider == "network").MinTime);
+        Assert.Equal(TimeSpan.FromMinutes(1), still.Single(r => r.Provider == "passive").MinTime);
+        Assert.All(still, r => Assert.Equal(25f, r.MinDistanceMeters));
+
+        // Solo los proveedores que hay.
+        Assert.Equal(["gps"], LocationPlan.Requests(TrackingMode.Moving, ["gps", "passive"]).Select(r => r.Provider));
+        Assert.Equal(["passive"], LocationPlan.Requests(TrackingMode.Still, ["gps", "passive"]).Select(r => r.Provider));
+        Assert.Empty(LocationPlan.Requests(TrackingMode.Still, []));
+    }
+
+    [Fact]
+    public void Motor_PasaAQuietoYVuelveAMoverseConElSensor()
+    {
+        var (engine, device) = Engine();
+        device.MotionAvailable = true;
+        engine.BeginTracking(Now.AddMinutes(-10));
+        Assert.Equal(TrackingMode.Moving, engine.Mode);
+        Assert.Equal(Now.AddMinutes(-5), engine.StillAt);
+
+        Assert.Equal(TrackingMode.Still, engine.UpdateTracking(Now));
+        Assert.Equal([TrackingMode.Still], device.Applied);
+
+        // Sin cambios no se vuelve a pedir nada al sistema.
+        engine.UpdateTracking(Now);
+        Assert.Single(device.Applied);
+
+        device.LastMotion = Now;
+        Assert.Equal(TrackingMode.Moving, engine.UpdateTracking(Now));
+        Assert.Equal([TrackingMode.Still, TrackingMode.Moving], device.Applied);
+        Assert.Equal(Now.AddMinutes(5), engine.StillAt);
+
+        // Al arrancar otra vez, moviendose sin pedir nada (lo pide el propio servicio).
+        engine.BeginTracking(Now);
+        Assert.Equal(TrackingMode.Moving, engine.Mode);
+        Assert.Equal(2, device.Applied.Count);
+    }
+
+    [Fact]
+    public void Motor_ApagadoOConFalloAlCambiarNoLanza()
+    {
+        var (engine, device) = Engine();
+        device.MotionAvailable = true;
+        engine.BeginTracking(Now.AddMinutes(-10));
+
+        engine.Running = false;
+        Assert.Equal(TrackingMode.Moving, engine.UpdateTracking(Now));
+        Assert.Empty(device.Applied);
+
+        engine.Running = true;
+        device.BrokenTracking = true;
+        Assert.Equal(TrackingMode.Still, engine.UpdateTracking(Now));
+        Assert.Equal(TrackingMode.Still, engine.Mode);
+    }
+
+    [Fact]
+    public async Task Motor_ElGpsConVelocidadEnciendeElGpsAunqueElSensorNoSalte()
+    {
+        await new World(_host.Phone).GroupAsync("Casa");
+        var (engine, device) = Engine();
+        device.MotionAvailable = true;
+        device.LastMotion = DateTimeOffset.UtcNow.AddHours(-1);
+        engine.BeginTracking(DateTimeOffset.UtcNow.AddMinutes(-10));
+
+        // Una lectura de red (o de GPS parado) con el movil quieto: pasa a quieto.
+        await engine.ProcessReadingAsync(new LocationReading("network", 40, -3, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(TrackingMode.Still, engine.Mode);
+        await engine.ProcessReadingAsync(Gps(40, -3, speed: 0.3));
+        Assert.Equal(TrackingMode.Still, engine.Mode);
+
+        // GPS con velocidad de ir andando (por la pasiva, de otra app): moviendose.
+        await engine.ProcessReadingAsync(Gps(40.001, -3, speed: 2));
+        Assert.Equal(TrackingMode.Moving, engine.Mode);
+        Assert.Equal([TrackingMode.Still, TrackingMode.Moving], device.Applied);
+
+        // Una vieja con velocidad no cuenta.
+        var (other, otherDevice) = Engine();
+        otherDevice.MotionAvailable = true;
+        other.BeginTracking(DateTimeOffset.UtcNow.AddMinutes(-10));
+        await other.ProcessReadingAsync(Gps(40, -3, speed: 2, at: DateTimeOffset.UtcNow.AddMinutes(-3)));
+        Assert.Equal(TrackingMode.Still, other.Mode);
+    }
+
+    [Fact]
+    public async Task Ciclo_PasaAQuietoAunqueEsteOcupado()
+    {
+        var (engine, device) = Engine();
+        device.MotionAvailable = true;
+        device.Online = false;
+        engine.BeginTracking(DateTimeOffset.UtcNow.AddMinutes(-6));
+        var work = (SemaphoreSlim)typeof(SharingEngine).GetField("_work", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(engine)!;
+        await work.WaitAsync();
+        await engine.RunCycleAsync();
+        work.Release();
+        Assert.Equal([TrackingMode.Still], device.Applied);
+    }
+
+    [Fact]
+    public async Task Ciclo_ConFcmSoloPreguntaAlServidorCadaMediaHora()
+    {
+        var world = new World(_host.Phone);
+        var g = await world.GroupAsync("Casa");
+        var (engine, _) = Engine();
+
+        // Primera vuelta: grupos, claves pedidas y eventos (respaldo del push), todo junto.
+        await engine.RunCycleAsync();
+        Assert.Contains(_host.Server.Requests, r => r.Path.Contains("key_share"));
+        Assert.Contains(_host.Server.Requests, r => r.Path.Contains("sos_alerts"));
+        Assert.Contains(_host.Server.Requests, r => r.Path == "/rest/v1/groups");
+
+        // Las siguientes, sin nada pendiente, no tocan la red.
+        _host.Server.Requests.Clear();
+        await engine.RunCycleAsync();
+        await engine.RunCycleAsync();
+        Assert.Empty(_host.Server.Requests);
+
+        // Lo pendiente sí sale en cada vuelta (SC-002).
+        await _host.Outbox.EnqueueAsync(40, -3, 8, 50, DateTimeOffset.UtcNow, [g.Id]);
+        await engine.RunCycleAsync();
+        Assert.Equal(0, await _host.Outbox.PendingCountAsync());
+        Assert.DoesNotContain(_host.Server.Requests, r => r.Path.Contains("key_share"));
+
+        // Pasada la media hora, otra vuelta al servidor.
+        typeof(SharingEngine).GetField("_lastServerCheck", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(engine, DateTimeOffset.UtcNow - SharingEngine.ServerCheckEveryWithPush);
+        _host.Server.Requests.Clear();
+        await engine.RunCycleAsync();
+        Assert.Contains(_host.Server.Requests, r => r.Path.Contains("key_share"));
+    }
+
+    [Fact]
+    public async Task Lectura_LaCacheDeGruposNoPreguntaEnCadaLectura()
+    {
+        await new World(_host.Phone).GroupAsync("Casa");
+        var (engine, _) = Engine();
+        int Groups() => _host.Server.Requests.Count(r => r.Path == "/rest/v1/groups");
+
+        await engine.ProcessReadingAsync(new LocationReading("network", 40, -3, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(1, Groups());
+        await engine.ProcessReadingAsync(new LocationReading("network", 40.01, -3, 30, null, DateTimeOffset.UtcNow));
+        await engine.ProcessReadingAsync(new LocationReading("network", 40.02, -3, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(1, Groups());
+        Assert.Equal(TimeSpan.FromMinutes(15), SharingEngine.GroupsMaxAgeOnReading);
+
+        // Una aprobacion que llega por push la invalida: la siguiente lectura pregunta.
+        await PushMessages.HandleAsync(new Dictionary<string, string>
+        {
+            ["type"] = EventTypes.RequestResolved, ["group_id"] = Guid.NewGuid().ToString(), ["event_id"] = Guid.NewGuid().ToString(),
+        }, _host.Phone.Service, null, () => new FakeNotifier());
+        await engine.ProcessReadingAsync(new LocationReading("network", 40.03, -3, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(2, Groups());
     }
 
     // -----------------------------------------------------------------------

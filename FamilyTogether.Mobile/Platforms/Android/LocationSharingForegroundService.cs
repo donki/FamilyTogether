@@ -19,19 +19,21 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// (sin Android, probado); aquí solo queda escuchar al sistema y darle lo que pide.
 /// </summary>
 /// <remarks>
-/// <para><b>Sin Google Play Services.</b> <see cref="LocationManager"/> del sistema con
-/// <c>GPS_PROVIDER</c> y <c>NETWORK_PROVIDER</c>, cada uno con <c>minDistance = 25 m</c> y
-/// <c>minTime = 30 s</c>: el sistema no despierta a la app mientras el móvil no se mueve, y moviéndose
-/// no entrega más de una lectura cada medio minuto por proveedor (batería, SC-005).</para>
+/// <para><b>Sin Google Play Services.</b> <see cref="LocationManager"/> del sistema, siempre con
+/// <c>minDistance = 25 m</c>. Qué proveedores y cada cuánto lo decide <see cref="LocationPlan"/>
+/// (2026-10-06, batería, SC-005): moviéndose, <c>GPS_PROVIDER</c> y <c>NETWORK_PROVIDER</c> cada
+/// 30 s; quieto (el sensor de movimiento significativo no ha saltado en 5 min), el GPS apagado y
+/// solo la red cada 5 min y la pasiva. El <c>minDistance</c> no apaga el GPS: solo filtra lo que se
+/// entrega; por eso hay que quitar la petición del GPS cuando no hace falta.</para>
+/// <para>El paso a quieto lo comprueba una alarma de <see cref="AlarmManager"/> (que despierta
+/// aunque el móvil duerma, a diferencia del temporizador del ciclo, que se para con la CPU): si no,
+/// con el móvil dormido en un cajón, el GPS se quedaría buscando satélites.</para>
 /// <para>Solo coge la CPU (bloqueo parcial con tiempo máximo) mientras procesa, no de forma
 /// continua como Hiker, que solo graba durante una ruta.</para>
 /// </remarks>
 [Service(Exported = false, ForegroundServiceType = ForegroundService.TypeLocation)]
-public class LocationSharingForegroundService : Service, ILocationListener, ISharingDevice
+public class LocationSharingForegroundService : Service, ILocationListener, ISharingDevice, AlarmManager.IOnAlarmListener
 {
-    /// <summary>Intervalo mínimo entre lecturas de un mismo proveedor.</summary>
-    private const long MinTimeMs = 30_000;
-
     /// <summary>Cada cuánto se reintenta lo pendiente y se consultan los eventos (ARQUITECTURA §7).</summary>
     private static readonly TimeSpan CycleEvery = TimeSpan.FromSeconds(60);
 
@@ -49,6 +51,8 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     private Timer? _timer;
     private bool _listening;
     private readonly SignificantMotion _motion = new();
+    private readonly object _requestLock = new();
+    private IList<string> _available = [];
 
     public LocationSharingForegroundService() => _engine = new SharingEngine(this);
 
@@ -127,6 +131,7 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
         {
             _timer?.Dispose();
             _timer = null;
+            CancelStillCheck();
             StopListening();
             ReleaseWakeLock();
             if (OperatingSystem.IsAndroidVersionAtLeast(24))
@@ -205,21 +210,12 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
                 return;
             }
 
-            var available = _locationManager.GetProviders(false) ?? [];
+            _available = _locationManager.GetProviders(false) ?? [];
 
-            // GPS: el que da precisión de metros en la calle. Red (wifi y antenas): la que funciona
-            // dentro de casa; muchas de sus lecturas no bajan de 25 m y se descartan, pero con wifi
-            // a menudo sí, y ahí el GPS no fija.
-            foreach (var provider in new[] { LocationManager.GpsProvider, LocationManager.NetworkProvider })
-            {
-                if (!available.Contains(provider))
-                    continue;
-
-                // Se registra aunque el proveedor esté apagado: si el usuario lo enciende después,
-                // Android empieza a entregar sin tener que reiniciar el servicio.
-                _locationManager.RequestLocationUpdates(provider, MinTimeMs, SharingEngine.ThresholdMeters, this, Looper.MainLooper);
-                _listening = true;
-            }
+            // Se arranca moviéndose: la primera posición buena sale con el GPS (SC-002); si en 5 min
+            // nada dice que se mueve, LocationPlan lo pasa a quieto y se apaga el GPS.
+            _engine.BeginTracking(DateTimeOffset.UtcNow);
+            Register(TrackingMode.Moving);
 
             if (!_listening)
                 NativeLog.Warn("Ni GPS ni red disponibles en este dispositivo.");
@@ -228,6 +224,7 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
                 _motion.Moved -= OnMoved;
                 _motion.Moved += OnMoved;
                 _motion.Start(this);
+                ScheduleStillCheck();
             }
         }
         catch (Java.Lang.SecurityException ex)
@@ -263,6 +260,106 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
         _listening = false;
     }
 
+    /// <summary>
+    /// Pide al sistema lo del modo (<see cref="LocationPlan.Requests"/>), quitando antes lo de antes.
+    /// Se registra aunque el proveedor esté apagado: si el usuario lo enciende después, Android
+    /// empieza a entregar sin tener que reiniciar el servicio.
+    /// </summary>
+    private void Register(TrackingMode mode)
+    {
+        lock (_requestLock)
+        {
+            if (_locationManager is null)
+                return;
+
+            _locationManager.RemoveUpdates(this);
+            var any = false;
+            foreach (var request in LocationPlan.Requests(mode, [.. _available]))
+            {
+                _locationManager.RequestLocationUpdates(request.Provider, (long)request.MinTime.TotalMilliseconds,
+                    request.MinDistanceMeters, this, Looper.MainLooper);
+                any = true;
+            }
+
+            _listening = any;
+        }
+    }
+
+    public void ApplyTracking(TrackingMode mode)
+    {
+        if (!_running)
+            return;
+
+        try
+        {
+            Register(mode);
+        }
+        catch (Java.Lang.SecurityException ex)
+        {
+            NativeLog.Warn("Servicio sin permiso de ubicación; se para.", ex);
+            SharingState.Enabled = false;
+            StopSelf();
+            return;
+        }
+
+        if (mode == TrackingMode.Moving)
+            ScheduleStillCheck();
+        else
+            CancelStillCheck();
+    }
+
+    // ==================================================================================
+    //  Comprobación de «quieto» (alarma que despierta)
+    // ==================================================================================
+
+    /// <summary>
+    /// Programa una alarma para cuando el móvil pasaría a quieto. Con el mismo oyente, la nueva
+    /// sustituye a la anterior. Sin sensor de movimiento no hay paso a quieto: no se programa.
+    /// Inexacta y sin «AllowWhileIdle»: en Doze espera a la ventana de mantenimiento, que basta.
+    /// </summary>
+    private void ScheduleStillCheck()
+    {
+        try
+        {
+            if (!_motion.Available || GetSystemService(AlarmService) is not AlarmManager alarms)
+                return;
+
+            var wait = _engine.StillAt - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+            if (wait < TimeSpan.FromSeconds(5))
+                wait = TimeSpan.FromSeconds(5);
+
+            alarms.Set(AlarmType.ElapsedRealtimeWakeup, SystemClock.ElapsedRealtime() + (long)wait.TotalMilliseconds,
+                "FamilyTogether:still", this, null);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo programar la comprobación de móvil quieto.", ex);
+        }
+    }
+
+    private void CancelStillCheck()
+    {
+        try
+        {
+            if (GetSystemService(AlarmService) is AlarmManager alarms)
+                alarms.Cancel(this);
+        }
+        catch (Exception)
+        {
+            // Nada que cancelar.
+        }
+    }
+
+    /// <summary>La alarma: si sigue moviéndose (otro aviso o velocidad), se vuelve a programar.</summary>
+    public void OnAlarm()
+    {
+        if (!_running)
+            return;
+
+        if (_engine.UpdateTracking(DateTimeOffset.UtcNow) == TrackingMode.Moving)
+            ScheduleStillCheck();
+    }
+
     public void OnLocationChanged(AndroidLocation location)
     {
         // Llega en el hilo principal: el trabajo (red, SQLite, cifrado) se hace fuera.
@@ -279,7 +376,12 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     public void OnStatusChanged(string? provider, [global::Android.Runtime.GeneratedEnum] Availability status, Bundle? extras) { }
 
     /// <summary>El sensor ha saltado: lo de antes puede ser el principio del recorrido.</summary>
-    private void OnMoved(DateTimeOffset at) => _ = Task.Run(() => _engine.PromoteStillReadingsAsync(at));
+    private void OnMoved(DateTimeOffset at)
+    {
+        // Lo primero, encender el GPS si estaba quieto (el aviso del sensor ya llega con retraso).
+        _engine.UpdateTracking(at);
+        _ = Task.Run(() => _engine.PromoteStillReadingsAsync(at));
+    }
 
     // ==================================================================================
     //  Ciclo de 60 s

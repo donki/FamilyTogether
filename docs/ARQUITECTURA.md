@@ -184,12 +184,22 @@ Secretos de la función: `FCM_SERVICE_ACCOUNT` (JSON), `GOOGLE_CLIENT_IDS`, `MIC
 
 El móvil, al recibir el mensaje, **descarta repetidos** (`event_id` ya visto), pide el evento por
 REST y monta el texto descifrando con la clave del grupo. Sin FCM configurado, el servicio de
-ubicación consulta cada 60 s los eventos nuevos (SOS, zonas, solicitudes) y avisa igual.
+ubicación consulta cada 60 s los eventos nuevos (SOS, zonas, solicitudes) y avisa igual. Con FCM,
+la misma consulta (junto con los grupos y las claves pedidas) va cada 30 min, de respaldo
+(2026-10-06, batería).
 
 ## 8. Ubicación
 
 - Servicio en primer plano de tipo `location` (el de Hiker), `LocationManager`/fused del sistema
   **sin Google Play Services**: `GPS_PROVIDER` y `NETWORK_PROVIDER` con `minDistance = 25 m`.
+- **Quieto o moviéndose (2026-10-06, `LocationPlan`, SC-005)**: el `minDistance` no apaga el GPS.
+  Moviéndose (sensor de movimiento significativo en los últimos 5 min, GPS a ≥ 1,4 m/s o primeros
+  5 min del servicio): GPS y red cada 30 s. Quieto: **sin GPS**, red cada 5 min y pasiva cada
+  minuto. El sensor o una lectura GPS con velocidad lo vuelven a encender; una alarma
+  (`AlarmManager`, despierta) comprueba el paso a quieto. Sin sensor, siempre moviéndose.
+- **Sin red si no hay nada**: caché de grupos de 15 min en las lecturas (la invalidan los cambios
+  hechos en el móvil y la aprobación por push); el ciclo de 60 s solo reintenta lo pendiente.
+- **Mapa en segundo plano**: se para con `Window.Stopped` (MAUI no llama a `OnDisappearing`).
 - **Qué entra en el historial (2026-09-28, `ReadingPolicy`)**: precisión peor de 100 m → fuera.
   Proveedor distinto de `gps` (red: wifi y antenas; pasivo) → **aproximada siempre**, diga lo que
   diga su precisión. GPS peor de 25 m → aproximada. GPS de 25 m o mejor → buena **solo si el móvil
