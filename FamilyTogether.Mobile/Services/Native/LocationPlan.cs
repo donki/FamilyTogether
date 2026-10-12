@@ -35,6 +35,9 @@ public sealed record ProviderRequest(string Provider, TimeSpan MinTime, float Mi
 /// Al saltar el sensor se vuelve a <see cref="TrackingMode.Moving"/> en el momento.</para>
 /// <para><b>Sin sensor</b> no hay forma barata de saber cuándo vuelve a moverse: siempre
 /// <see cref="TrackingMode.Moving"/>, como antes.</para>
+/// <para><b>Latido</b> (2026-10-12, <see cref="SendPolicy"/>): con el móvil quieto del todo, el
+/// <c>minDistance</c> hace que el sistema no entregue nada; para enviar la posición una vez por hora
+/// el servicio pide una lectura suelta (<see cref="FreshFixProvider"/>).</para>
 /// <para><b>Sin lotes</b> (<c>maxUpdateDelay</c>): moviéndose, juntar lecturas retrasaría la posición
 /// en el mapa de los demás por encima de los 60 s de SC-002; quieto, con la red cada 5 min, no hay
 /// nada que juntar.</para>
@@ -53,6 +56,19 @@ public static class LocationPlan
 
     /// <summary>Quieto: lo que otras apps pidan, como mucho una por minuto.</summary>
     public static readonly TimeSpan StillPassiveEvery = TimeSpan.FromMinutes(1);
+
+    /// <summary>Latido (<see cref="SendPolicy"/>): tiempo máximo esperando la lectura pedida.</summary>
+    public static readonly TimeSpan FreshFixTimeout = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Latido: de qué proveedor se pide la lectura suelta. La red (un escaneo de wifi y antenas,
+    /// barato) si está encendida; si no, el GPS (con <see cref="FreshFixTimeout"/>, para que dentro
+    /// de casa no se quede buscando satélites); sin ninguno, nada.
+    /// </summary>
+    public static string? FreshFixProvider(IReadOnlyCollection<string> enabled) =>
+        enabled.Contains(NetworkProvider) ? NetworkProvider
+        : enabled.Contains(GpsProvider) ? GpsProvider
+        : null;
 
     /// <summary>Sin movimiento durante este tiempo, el móvil está quieto.</summary>
     public static TimeSpan StillAfter => ReadingPolicy.MotionWindow;

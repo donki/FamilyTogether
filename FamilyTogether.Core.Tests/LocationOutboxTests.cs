@@ -97,6 +97,29 @@ public class LocationOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task ElLatidoEntraAunqueNoSeMuevaNiHayanPasadoDiezMinutos()
+    {
+        var a = Guid.NewGuid();
+        var outbox = new LocationOutbox(_db);
+        var t0 = new DateTimeOffset(2026, 10, 12, 10, 0, 0, TimeSpan.Zero);
+
+        await outbox.EnqueueAsync(40.0, -3.0, 8, 50, t0, [a]);
+        // Sin forzar: a 0 m, fuera; y una aproximada con una buena hace 2 min, tambien.
+        Assert.False(await outbox.EnqueueAsync(40.0, -3.0, 8, 50, t0.AddMinutes(1), [a]));
+        Assert.False(await outbox.EnqueueAsync(40.0, -3.0, 40, 50, t0.AddMinutes(2), [a], coarse: true));
+
+        // El latido sale tal cual, buena o aproximada, y conserva su clase.
+        Assert.True(await outbox.EnqueueAsync(40.0, -3.0, 8, 50, t0.AddMinutes(3), [a], force: true));
+        Assert.True(await outbox.EnqueueAsync(40.0, -3.0, 40, 50, t0.AddMinutes(4), [a], coarse: true, force: true));
+        var rows = await outbox.PeekAsync();
+        Assert.Equal([false, false, true], rows.Select(r => r.Coarse));
+
+        // Pero nunca sin grupos ni peor de 100 m.
+        Assert.False(await outbox.EnqueueAsync(40.0, -3.0, 8, 50, t0.AddMinutes(5), [], force: true));
+        Assert.False(await outbox.EnqueueAsync(40.0, -3.0, 150, 50, t0.AddMinutes(5), [a], force: true));
+    }
+
+    [Fact]
     public async Task SiCambianLosGruposEntraAunqueNoSeMueva()
     {
         var a = Guid.NewGuid();

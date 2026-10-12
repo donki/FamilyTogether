@@ -205,9 +205,22 @@ la misma consulta (junto con los grupos y las claves pedidas) va cada 30 min, de
   diga su precisión. GPS peor de 25 m → aproximada. GPS de 25 m o mejor → buena **solo si el móvil
   se mueve**: sensor `TYPE_SIGNIFICANT_MOTION` disparado en los últimos 5 min o velocidad del GPS
   ≥ 1,4 m/s; si no, deriva → aproximada. Sin ese sensor, como antes (el GPS bueno entra). La
-  primera buena de cada arranque del servicio entra siempre. Una buena se envía si hay ≥ 25 m desde
-  la última enviada; una aproximada, si en 10 min no ha habido otra ni una buena
-  (`LocationOutbox.EnqueueAsync(..., coarse)`).
+  primera buena de cada arranque del servicio entra siempre.
+- **Cuándo se envía: al moverse o cada hora (2026-10-12, `SendPolicy`)**. Una buena (ya es
+  movimiento de verdad, por lo de arriba) sale si hay ≥ 25 m desde la última buena enviada (FR-009).
+  Una aproximada solo cuenta como movimiento si el sensor no dice «quieto», está a ≥ 100 m de la
+  última enviada (de cualquier clase) y los círculos de precisión no se tocan (distancia > precisión
+  de esta + la de aquella); además la cola la sigue limitando a una cada 10 min sin otra ni una buena
+  (`LocationOutbox.EnqueueAsync(..., coarse)`). **Latido**: pasada 1 h desde la última enviada, la
+  siguiente lectura válida sale aunque no se haya movido (`EnqueueAsync(..., force: true)`, sin los
+  filtros de la cola). La última enviada (posición, precisión y hora) se guarda en
+  `SharingState.LastSentFix`; sin ninguna, la hora cuenta desde el arranque del servicio.
+- **Despertar para el latido**: con el móvil quieto del todo el `minDistance` hace que no llegue
+  ninguna lectura. Una alarma `setAndAllowWhileIdle` (`HeartbeatReceiver`, salta también en Doze, sin
+  permiso de alarmas exactas) despierta al servicio a la hora de la última enviada; si toca, pide
+  una lectura suelta: la última conocida si es de hace < 2 min, si no `getCurrentLocation` (Android
+  11+) o `requestSingleUpdate` de la red, o del GPS si la red está apagada, con 1 min como mucho.
+  Si no llega nada, se reintenta cada 10 min. El ciclo de 60 s también lo mira cuando está despierto.
 - **Sensor de movimiento significativo** (`SignificantMotion`): de disparo único y de activación,
   lo vigila el concentrador de sensores del chip y solo despierta a la app al detectar que el
   usuario cambia de sitio; se vuelve a armar tras cada disparo. Android lo exige de bajo consumo

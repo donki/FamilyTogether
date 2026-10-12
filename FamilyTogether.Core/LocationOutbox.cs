@@ -101,10 +101,12 @@ public sealed class LocationOutbox
     /// </summary>
     /// <param name="coarse">Aproximada aunque la precision diga otra cosa (lectura de red, o del
     /// GPS con el movil quieto: <see cref="ReadingPolicy"/>). Sin valor, la decide la precision.</param>
+    /// <param name="force">Sin los filtros de tiempo y distancia: el latido de cada hora
+    /// (<see cref="SendPolicy"/>), que sale aunque no se haya movido.</param>
     /// <returns>Si se encolo (para guardarla tambien en <see cref="LocalTrack"/>).</returns>
     public async Task<bool> EnqueueAsync(
         double lat, double lon, double accuracy, int battery, DateTimeOffset at,
-        IReadOnlyList<Guid> sharingGroups, bool? coarse = null, CancellationToken cancellationToken = default)
+        IReadOnlyList<Guid> sharingGroups, bool? coarse = null, bool force = false, CancellationToken cancellationToken = default)
     {
         if (sharingGroups.Count == 0 || accuracy > CoarseMaxAccuracyMeters || double.IsNaN(lat) || double.IsNaN(lon))
             return false;
@@ -114,7 +116,11 @@ public sealed class LocationOutbox
         var groups = string.Join(',', sharingGroups.Distinct().Order().Select(g => g.ToString("D")));
         var last = await _db.FindAsync<LastRow>(1).ConfigureAwait(false);
         var isCoarse = coarse ?? accuracy > MaxAccuracyMeters;
-        if (isCoarse)
+        if (force)
+        {
+            // El latido: sale tal cual.
+        }
+        else if (isCoarse)
         {
             // Aproximada (decision de Josep, 2026-09-27): solo si en 10 minutos no ha habido ninguna
             // buena ni otra aproximada. En interiores la red da unos 100 m y sin esto el grupo no te

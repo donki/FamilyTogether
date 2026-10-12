@@ -1,5 +1,42 @@
 # Changelog — Family Together
 
+## 2026.10.12.00
+
+- **La posición se envía al moverse o cada hora** (petición de Josep). Antes: una lectura buena (GPS
+  de 25 m o mejor con el móvil moviéndose) salía a 25 m de la última buena, y una aproximada (red, o
+  GPS con el móvil quieto) cada 10 min como mucho, **se moviera o no**: con el móvil en casa, los
+  saltos de la wifi y las antenas mandaban una posición cada 10 min. Y con el móvil quieto del todo,
+  si el sistema no entregaba nada (el `minDistance` de 25 m), el grupo podía pasar horas sin noticias.
+  Ahora decide `SendPolicy` (`FamilyTogether.Core`, lógica pura):
+  - **Movimiento**: una buena, a ≥ 25 m de la última buena enviada (FR-009, como antes: es el
+    detalle del recorrido, y ya solo es buena si el sensor o la velocidad dicen que se mueve). Una
+    aproximada, solo si el sensor de movimiento no dice «quieto», está a ≥ 100 m de la última
+    enviada y los círculos de precisión no se tocan (distancia > precisión de esta + la de aquella);
+    la cola la sigue limitando a una cada 10 min.
+  - **Latido**: pasada 1 h desde la última enviada (de cualquier clase), la siguiente lectura válida
+    sale aunque no se haya movido; la cola no la filtra (`EnqueueAsync(..., force: true)`). La
+    última enviada, con su precisión y su hora, se guarda en `SharingState.LastSentFix`.
+  - **Despertar**: una alarma `setAndAllowWhileIdle` (`HeartbeatReceiver`; salta también en Doze y no
+    necesita el permiso de alarmas exactas) despierta al servicio a la hora de la última enviada; si
+    toca, pide una lectura suelta: la última conocida si es de hace menos de 2 min (gratis); si no,
+    `getCurrentLocation` (Android 11+) o `requestSingleUpdate` de la **red**, o del GPS si la red
+    está apagada, con 1 min como mucho. Sin lectura, reintento cada 10 min. El ciclo de 60 s lo mira
+    también cuando está despierto. Lo pedido moviéndose o quieto (`LocationPlan`) no cambia.
+  - La última posición para el SOS (`SharingEngine.LastFix`) se actualiza con cada lectura válida,
+    aunque no se envíe.
+- **Pruebas**: 535 (antes 515), todas pasan: `SendPolicyTests` (9: movida ≥ 25 m sale; quieta antes
+  de la hora no; a la hora sí; aproximada con el sensor quieto nunca es movimiento; aproximada
+  imprecisa no cuenta; sin referencia; cuándo despierta la alarma), el latido en la cola, y en el
+  motor (`NativeTests`) el recorrido entero lectura → cola → servidor falso: quieto no sale hasta la
+  hora y entonces sí; la red que baila con el móvil quieto no sale; cuándo se pide la lectura del
+  latido y su reintento; el ciclo la pide. **No se puede automatizar** (va a la prueba a mano): que
+  la alarma salte de verdad en Doze y que llegue la lectura suelta en el Xiaomi con el móvil quieto
+  más de una hora (en el registro: «Latido: …»).
+- **Cobertura de toda la app: 87,2 %** (antes 88,1 %; lo instrumentado sigue en 98,1 %). **Baja**
+  porque la alarma y la lectura suelta son llamadas a Android en `LocationSharingForegroundService`
+  (unas 75 líneas que el banco no compila); la decisión está toda en `SendPolicy` y el motor,
+  probados. El plan para volver al 90 % sigue en `09-TAREAS-FamilyTogether.md`.
+
 ## 2026.10.06.00
 
 - **Batería: objetivo SC-005 (< 5 % en 24 h).** Lo que más gastaba, de mayor a menor:

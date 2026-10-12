@@ -28,6 +28,12 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// <para>El paso a quieto lo comprueba una alarma de <see cref="AlarmManager"/> (que despierta
 /// aunque el móvil duerma, a diferencia del temporizador del ciclo, que se para con la CPU): si no,
 /// con el móvil dormido en un cajón, el GPS se quedaría buscando satélites.</para>
+/// <para><b>Latido</b> (2026-10-12, <see cref="SendPolicy"/>): la posición sale al moverse o, como
+/// mucho, cada hora. Con el móvil quieto del todo el sistema no entrega lecturas (el
+/// <c>minDistance</c>), así que una alarma <c>setAndAllowWhileIdle</c> (<see cref="HeartbeatReceiver"/>,
+/// que también salta en Doze, sin permiso de alarmas exactas) despierta al servicio a la hora de la
+/// última enviada; si toca, pide una lectura suelta (<see cref="RequestFreshFix"/>: la red, o el GPS
+/// con tiempo máximo) y el motor la envía como latido.</para>
 /// <para>Solo coge la CPU (bloqueo parcial con tiempo máximo) mientras procesa, no de forma
 /// continua como Hiker, que solo graba durante una ruta.</para>
 /// </remarks>
@@ -41,6 +47,12 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     private const long WakeLockTimeoutMs = 60_000;
 
     private static volatile bool _running;
+
+    /// <summary>El servicio vivo, para la alarma del latido (<see cref="HeartbeatReceiver"/>).</summary>
+    private static LocationSharingForegroundService? _instance;
+
+    /// <summary>Código del <see cref="PendingIntent"/> de la alarma del latido.</summary>
+    private const int HeartbeatRequestCode = 7301;
 
     /// <summary>Verdadero mientras el servicio está vivo y en primer plano.</summary>
     public static bool IsRunning => _running;
@@ -115,8 +127,10 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
 
         _running = true;
         _engine.Running = true;
+        _instance = this;
         StartListening();
         StartCycle();
+        ScheduleHeartbeat();
 
         // Sticky: si Android mata el proceso por memoria, recrea el servicio y se sigue compartiendo.
         return StartCommandResult.Sticky;
@@ -126,12 +140,15 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     {
         _running = false;
         _engine.Running = false;
+        if (ReferenceEquals(_instance, this))
+            _instance = null;
 
         try
         {
             _timer?.Dispose();
             _timer = null;
             CancelStillCheck();
+            CancelHeartbeat();
             StopListening();
             ReleaseWakeLock();
             if (OperatingSystem.IsAndroidVersionAtLeast(24))
@@ -360,7 +377,172 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
             ScheduleStillCheck();
     }
 
-    public void OnLocationChanged(AndroidLocation location)
+    // ==================================================================================
+    //  Latido de cada hora (alarma que despierta también en Doze)
+    // ==================================================================================
+
+    /// <summary>
+    /// Programa la alarma del latido para <see cref="SharingEngine.NextHeartbeatCheck"/>. Inexacta y
+    /// con «AllowWhileIdle»: en Doze salta igual (como mucho una cada 9 min por app, de sobra) y no
+    /// necesita el permiso de alarmas exactas. La nueva sustituye a la anterior (mismo código).
+    /// </summary>
+    private void ScheduleHeartbeat()
+    {
+        try
+        {
+            if (GetSystemService(AlarmService) is not AlarmManager alarms || HeartbeatIntent() is not { } pending)
+                return;
+
+            var now = DateTimeOffset.UtcNow;
+            var wait = _engine.NextHeartbeatCheck(now) - now;
+            if (wait < TimeSpan.FromSeconds(30))
+                wait = TimeSpan.FromSeconds(30);
+
+            alarms.SetAndAllowWhileIdle(AlarmType.ElapsedRealtimeWakeup,
+                SystemClock.ElapsedRealtime() + (long)wait.TotalMilliseconds, pending);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo programar el latido de la posición.", ex);
+        }
+    }
+
+    private void CancelHeartbeat()
+    {
+        try
+        {
+            if (GetSystemService(AlarmService) is AlarmManager alarms && HeartbeatIntent() is { } pending)
+                alarms.Cancel(pending);
+        }
+        catch (Exception)
+        {
+            // Nada que cancelar.
+        }
+    }
+
+    private PendingIntent? HeartbeatIntent() =>
+        PendingIntent.GetBroadcast(this, HeartbeatRequestCode, new Intent(this, typeof(HeartbeatReceiver)),
+            PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+
+    /// <summary>La alarma del latido (<see cref="HeartbeatReceiver"/>): mira si toca y la reprograma.</summary>
+    internal static void OnHeartbeatAlarm()
+    {
+        var service = _instance;
+        if (service is null || !_running)
+            return;
+
+        service._engine.CheckHeartbeat(DateTimeOffset.UtcNow);
+        service.ScheduleHeartbeat();
+    }
+
+    /// <summary>
+    /// Pide una lectura suelta (<see cref="LocationPlan.FreshFixProvider"/>), con tiempo máximo
+    /// <see cref="LocationPlan.FreshFixTimeout"/>. Antes mira la última conocida de cada proveedor:
+    /// si es reciente (de otra app, por ejemplo), vale y no se enciende nada.
+    /// </summary>
+    public void RequestFreshFix()
+    {
+        var manager = _locationManager;
+        if (manager is null || !_running)
+            return;
+
+        try
+        {
+            AcquireWakeLock();
+
+            // Una reciente ya calculada por el sistema: gratis.
+            var now = DateTimeOffset.UtcNow;
+            AndroidLocation? recent = null;
+            foreach (var provider in _available)
+            {
+                var known = manager.GetLastKnownLocation(provider);
+                if (known is null || now - DateTimeOffset.FromUnixTimeMilliseconds(known.Time) > SharingEngine.MaxReadingAge)
+                    continue;
+                if (recent is null || known.Time > recent.Time)
+                    recent = known;
+            }
+            if (recent is not null)
+            {
+                Deliver(recent);
+                return;
+            }
+
+            var enabled = _available.Where(p =>
+            {
+                try { return manager.IsProviderEnabled(p); }
+                catch { return false; }
+            }).ToList();
+            var chosen = LocationPlan.FreshFixProvider(enabled);
+            if (chosen is null)
+            {
+                NativeLog.Warn("Latido: ni la red ni el GPS están encendidos; no se puede pedir una lectura.");
+                ReleaseWakeLock();
+                return;
+            }
+
+            var handler = new Handler(Looper.MainLooper!);
+            var timeout = (long)LocationPlan.FreshFixTimeout.TotalMilliseconds;
+            if (OperatingSystem.IsAndroidVersionAtLeast(30))
+            {
+                var cancel = new CancellationSignal();
+                manager.GetCurrentLocation(chosen, cancel, MainExecutor!, new FreshFixConsumer(this));
+                handler.PostDelayed(() => cancel.Cancel(), timeout);
+            }
+            else
+            {
+                var once = new FreshFixListener(this);
+#pragma warning disable CS0618, CA1422 // requestSingleUpdate: obsoleto en Android 11, aquí solo para 7-10.
+                manager.RequestSingleUpdate(chosen, once, Looper.MainLooper);
+#pragma warning restore CS0618, CA1422
+                handler.PostDelayed(() =>
+                {
+                    try { manager.RemoveUpdates(once); }
+                    catch (Exception) { /* Ya entregada o sin permiso: nada que quitar. */ }
+                }, timeout);
+            }
+        }
+        catch (Java.Lang.SecurityException ex)
+        {
+            NativeLog.Warn("Latido: sin permiso de ubicación.", ex);
+            ReleaseWakeLock();
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Error("Latido: no se pudo pedir una lectura.", ex);
+            ReleaseWakeLock();
+        }
+    }
+
+    /// <summary>La lectura suelta del latido (Android 11+).</summary>
+    private sealed class FreshFixConsumer(LocationSharingForegroundService service) : Java.Lang.Object, Java.Util.Functions.IConsumer
+    {
+        public void Accept(Java.Lang.Object? value)
+        {
+            if (value is AndroidLocation location)
+                service.Deliver(location);
+            else
+            {
+                NativeLog.Info("Latido: no ha llegado ninguna lectura a tiempo; se reintentará.");
+                service.ReleaseWakeLock();
+            }
+        }
+    }
+
+    /// <summary>La lectura suelta del latido (Android 7-10).</summary>
+    private sealed class FreshFixListener(LocationSharingForegroundService service) : Java.Lang.Object, ILocationListener
+    {
+        public void OnLocationChanged(AndroidLocation location) => service.Deliver(location);
+
+        public void OnProviderDisabled(string provider) { }
+
+        public void OnProviderEnabled(string provider) { }
+
+        public void OnStatusChanged(string? provider, [global::Android.Runtime.GeneratedEnum] Availability status, Bundle? extras) { }
+    }
+
+    public void OnLocationChanged(AndroidLocation location) => Deliver(location);
+
+    private void Deliver(AndroidLocation location)
     {
         // Llega en el hilo principal: el trabajo (red, SQLite, cifrado) se hace fuera.
         var reading = new LocationReading(location.Provider, location.Latitude, location.Longitude,

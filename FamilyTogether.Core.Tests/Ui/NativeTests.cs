@@ -59,6 +59,13 @@ internal sealed class FakeDevice(IServiceProvider services) : ISharingDevice
     public bool BrokenWakeLock { get; set; }
     public void AcquireWakeLock() { if (BrokenWakeLock) throw new InvalidOperationException("sin bloqueo"); WakeLocks++; }
     public void ReleaseWakeLock() => Releases++;
+    public int FreshFixRequests { get; private set; }
+    public bool BrokenFreshFix { get; set; }
+    public void RequestFreshFix()
+    {
+        if (BrokenFreshFix) throw new InvalidOperationException("sin LocationManager");
+        FreshFixRequests++;
+    }
     public List<TrackingMode> Applied { get; } = [];
     public bool BrokenTracking { get; set; }
     public void ApplyTracking(TrackingMode mode)
@@ -943,5 +950,162 @@ public class NativeTests : IDisposable
 
         NativeLog.Logcat = (_, _) => throw new InvalidOperationException("sin logcat");
         NativeLog.Info("sigue");
+    }
+
+    // -----------------------------------------------------------------------
+    // Al moverse o cada hora (SendPolicy, 2026-10-12)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void UltimaEnviadaConHoraSeGuardaYUnaIlegibleNoLanza()
+    {
+        Assert.Null(SharingState.LastSentFix);
+        var at = DateTimeOffset.FromUnixTimeMilliseconds(1_760_000_000_123);
+        SharingState.LastSentFix = new SentFix(40.123456789, -3.5, 12.5, at);
+        Assert.Equal(new SentFix(40.123456789, -3.5, 12.5, at), SharingState.LastSentFix);
+
+        SharingState.LastSentFix = null;
+        Assert.Null(SharingState.LastSentFix);
+        Assert.False(_store.Values.ContainsKey("last_any"));
+
+        _store.Values["last_any"] = "40|-3|x|1";
+        Assert.Null(SharingState.LastSentFix);
+        _store.Values["last_any"] = "40|-3";
+        Assert.Null(SharingState.LastSentFix);
+
+        _store.Broken = true;
+        Assert.Null(SharingState.LastSentFix);
+        SharingState.LastSentFix = new SentFix(1, 2, 3, at);
+    }
+
+    [Fact]
+    public async Task Envio_QuietoNoSaleHastaLaHoraYEntoncesSaleElLatido()
+    {
+        await new World(_host.Phone).GroupAsync("Casa");
+        var (engine, _) = Engine();
+        int Posts() => _host.Server.To("POST", "/rest/v1/positions").Count();
+
+        // La primera sale y queda de referencia, con su hora.
+        await engine.ProcessReadingAsync(Gps(40, -3));
+        Assert.Equal(1, Posts());
+        var first = SharingState.LastSentFix;
+        Assert.NotNull(first);
+
+        // Quieto (a 5 m) antes de la hora: no sale, pero queda de ultima posicion para el SOS.
+        await engine.ProcessReadingAsync(Gps(40.00005, -3, acc: 6));
+        Assert.Equal(1, Posts());
+        Assert.Equal(6, SharingEngine.LastFix!.Accuracy);
+        Assert.Equal(first, SharingState.LastSentFix);
+
+        // Pasada la hora sin enviar nada: sale aunque no se haya movido (la cola no la filtra).
+        SharingState.LastSentFix = first!.Value with { At = DateTimeOffset.UtcNow - SendPolicy.HeartbeatEvery };
+        await engine.ProcessReadingAsync(Gps(40.00005, -3, acc: 6));
+        Assert.Equal(2, Posts());
+        Assert.Equal(6, SharingState.LastSentFix!.Value.Accuracy);
+        Assert.True(DateTimeOffset.UtcNow - SharingState.LastSentFix!.Value.At < TimeSpan.FromMinutes(1));
+
+        // Y moverse 25 m o mas sale en el momento.
+        await engine.ProcessReadingAsync(Gps(40.0005, -3));
+        Assert.Equal(3, Posts());
+    }
+
+    [Fact]
+    public async Task Envio_LaRedQueBailaConElMovilQuietoNoSaleSoloElLatido()
+    {
+        await new World(_host.Phone).GroupAsync("Casa");
+        var (engine, device) = Engine();
+        device.MotionAvailable = true;
+        device.LastMotion = DateTimeOffset.UtcNow.AddHours(-2);
+        engine.BeginTracking(DateTimeOffset.UtcNow.AddMinutes(-30));
+        int Posts() => _host.Server.To("POST", "/rest/v1/positions").Count();
+
+        // Primera aproximada: sale (no hay referencia).
+        await engine.ProcessReadingAsync(new LocationReading("network", 40, -3, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(1, Posts());
+
+        // Saltos de la red de 1 km con el sensor diciendo quieto: nada, aunque pasen los 10 min de la cola.
+        SharingState.LastSentFix = SharingState.LastSentFix!.Value with { At = DateTimeOffset.UtcNow.AddMinutes(-30) };
+        await engine.ProcessReadingAsync(new LocationReading("network", 40.01, -3, 30, null, DateTimeOffset.UtcNow));
+        await engine.ProcessReadingAsync(new LocationReading("network", 40.0, -3.01, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(1, Posts());
+        Assert.Equal(ReadingKind.Discard, engine.Classify(new LocationReading("network", 40.01, -3, 30, null, DateTimeOffset.UtcNow), DateTimeOffset.UtcNow));
+
+        // A la hora, el latido.
+        SharingState.LastSentFix = SharingState.LastSentFix!.Value with { At = DateTimeOffset.UtcNow.AddMinutes(-61) };
+        Assert.Equal((ReadingKind.Coarse, SendReason.Heartbeat),
+            engine.Decide(new LocationReading("network", 40.0001, -3, 30, null, DateTimeOffset.UtcNow), DateTimeOffset.UtcNow));
+        await engine.ProcessReadingAsync(new LocationReading("network", 40.0001, -3, 30, null, DateTimeOffset.UtcNow));
+        Assert.Equal(2, Posts());
+
+        // Con el sensor saltando, la red si cuenta como movimiento si se va lejos (la cola aun la
+        // limita a una cada 10 min).
+        device.LastMotion = DateTimeOffset.UtcNow;
+        Assert.Equal((ReadingKind.Coarse, SendReason.Moved),
+            engine.Decide(new LocationReading("network", 40.01, -3, 30, null, DateTimeOffset.UtcNow), DateTimeOffset.UtcNow));
+        Assert.Equal((ReadingKind.Coarse, SendReason.Skip),
+            engine.Decide(new LocationReading("network", 40.0005, -3, 30, null, DateTimeOffset.UtcNow), DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void Latido_PideUnaLecturaSoloSiTocaYNoMasDeUnaCadaDiezMinutos()
+    {
+        var (engine, device) = Engine();
+        // En milisegundos, como se guarda la hora de la ultima enviada.
+        var now = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        engine.BeginTracking(now.AddMinutes(-5));
+
+        // Apagado, o recien enviada: nada.
+        engine.Running = false;
+        Assert.False(engine.CheckHeartbeat(now.AddHours(2)));
+        engine.Running = true;
+        SharingState.LastSentFix = new SentFix(40, -3, 8, now.AddMinutes(-20));
+        Assert.False(engine.CheckHeartbeat(now));
+        Assert.Equal(now.AddMinutes(40), engine.NextHeartbeatCheck(now));
+        Assert.Equal(0, device.FreshFixRequests);
+
+        // Una hora sin enviar: pide una lectura; enseguida otra vez no; a los 10 min, si.
+        SharingState.LastSentFix = new SentFix(40, -3, 8, now.AddMinutes(-60));
+        Assert.True(engine.CheckHeartbeat(now));
+        Assert.False(engine.CheckHeartbeat(now.AddMinutes(9)));
+        Assert.Equal(now + SendPolicy.FixRetryEvery, engine.NextHeartbeatCheck(now));
+        Assert.True(engine.CheckHeartbeat(now + SendPolicy.FixRetryEvery));
+        Assert.Equal(2, device.FreshFixRequests);
+
+        // Si el dispositivo falla, se registra y no lanza.
+        device.BrokenFreshFix = true;
+        Assert.False(engine.CheckHeartbeat(now.AddMinutes(30)));
+    }
+
+    [Fact]
+    public void Latido_SinNadaEnviadoCuentaDesdeElArranque()
+    {
+        var (engine, device) = Engine();
+        var now = DateTimeOffset.UtcNow;
+        engine.BeginTracking(now.AddMinutes(-59));
+        Assert.False(engine.CheckHeartbeat(now));
+        Assert.Equal(now.AddMinutes(1), engine.NextHeartbeatCheck(now));
+        Assert.True(engine.CheckHeartbeat(now.AddMinutes(1)));
+        Assert.Equal(1, device.FreshFixRequests);
+    }
+
+    [Fact]
+    public async Task Ciclo_PideLaLecturaDelLatido()
+    {
+        var (engine, device) = Engine();
+        device.Online = false;
+        SharingState.LastSentFix = new SentFix(40, -3, 8, DateTimeOffset.UtcNow.AddHours(-2));
+        await engine.RunCycleAsync();
+        await engine.RunCycleAsync();
+        Assert.Equal(1, device.FreshFixRequests);
+    }
+
+    [Fact]
+    public void Plan_ElLatidoPideLaRedYSiNoElGps()
+    {
+        Assert.Equal("network", LocationPlan.FreshFixProvider(["gps", "network", "passive"]));
+        Assert.Equal("gps", LocationPlan.FreshFixProvider(["gps", "passive"]));
+        Assert.Null(LocationPlan.FreshFixProvider(["passive"]));
+        Assert.Null(LocationPlan.FreshFixProvider([]));
+        Assert.True(LocationPlan.FreshFixTimeout <= TimeSpan.FromMinutes(2));
     }
 }

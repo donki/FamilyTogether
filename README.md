@@ -41,13 +41,13 @@ dotnet test FamilyTogether.Core.Tests
 
 ## Pruebas
 
-515 pruebas (xUnit), todas pasan; el banco tarda unos 25 s (sin contar la compilación). Medido el
-2026-10-06:
+535 pruebas (xUnit), todas pasan; el banco tarda unos 25 s (sin contar la compilación). Medido el
+2026-10-12:
 
-- **Cobertura de lo instrumentado: 98,1 %** de las líneas (5434 de 5541).
-- **Cobertura sobre toda la app: 88,1 %** (5434 de 6165 líneas ejecutables de C# de Core y Mobile).
-  Bajó del 90,1 % con el ahorro de batería en el servicio de Android; el plan para volver está en
-  el CHANGELOG (2026.10.06.00).
+- **Cobertura de lo instrumentado: 98,1 %** de las líneas (5509 de 5613).
+- **Cobertura sobre toda la app: 87,2 %** (5509 de 6315 líneas ejecutables de C# de Core y Mobile).
+  Bajó del 90,1 % con el ahorro de batería (2026.10.06.00) y el latido de cada hora (2026.10.12.00)
+  en el servicio de Android; el plan para volver está en el CHANGELOG (2026.10.06.00).
 
 Cómo se consigue: `FamilyTogether.Core.Tests\App\FamilyTogether.App.csproj` compila **toda la app
 MAUI** (páginas, controles, servicios y la lógica de la parte nativa) para `net10.0`, sin Android,
@@ -56,7 +56,7 @@ botones, contestan los diálogos, disparan los temporizadores) con dobles de MAU
 almacén seguro, hilo principal, animaciones, WebView del mapa) y un servidor Supabase falso con
 estado (`World`). Lo que hacía el servicio de ubicación, el FCM, los avisos y el inicio automático
 está en `Services\Native\` (sin tipos de Android); en `Platforms\Android` solo queda la llamada al
-sistema, que no se ejecuta aquí y **cuenta como no cubierta** (unas 470 líneas: es casi todo lo que
+sistema, que no se ejecuta aquí y **cuenta como no cubierta** (unas 700 líneas: es casi todo lo que
 falta).
 
 **Cómo se cuenta «toda la app»** (`tools\cobertura-app.py`, el mismo script que Credentials):

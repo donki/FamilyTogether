@@ -46,7 +46,7 @@ P1 = imprescindible para el MVP; P2 = necesaria antes de publicar; P3 = mejora.
 | FR-006 | Invitaciones en código y QR con caducidad de 5 min. |
 | FR-007 | Unirse genera una solicitud; aprueba o rechaza un administrador; se avisa a todos los administradores. |
 | FR-008 | Nombrar y quitar administradores, expulsar; siempre al menos un administrador. |
-| FR-009 | Enviar la posición al desplazarse ≥ 25 m, también en segundo plano o con la app cerrada. |
+| FR-009 | Enviar la posición al desplazarse ≥ 25 m y, aunque no se mueva, al menos una vez cada hora; también en segundo plano o con la app cerrada. |
 | FR-010 | Solo entran en el historial y en las zonas las lecturas del **GPS** de 25 m o mejor **con el móvil moviéndose**; las de red (wifi, antenas), las del GPS peores de 25 m (hasta 100) o con el móvil quieto solo actualizan la última posición del mapa (aproximadas). |
 | FR-011 | Enviar la batería con cada posición. |
 | FR-012 | Mapa: última posición, hora, batería o «En pausa» por miembro. |

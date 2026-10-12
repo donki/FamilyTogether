@@ -44,6 +44,13 @@ public interface ISharingDevice
     /// </summary>
     void ApplyTracking(TrackingMode mode);
 
+    /// <summary>
+    /// Pide al sistema una lectura nueva ya (el latido de cada hora, <see cref="SendPolicy"/>): con
+    /// el móvil quieto del todo el sistema no entrega nada (el <c>minDistance</c>). Lo que llegue
+    /// entra por el camino de siempre (<see cref="SharingEngine.ProcessReadingAsync"/>).
+    /// </summary>
+    void RequestFreshFix();
+
     /// <summary>Coge la CPU (con tiempo máximo) mientras se procesa.</summary>
     void AcquireWakeLock();
 
@@ -60,7 +67,8 @@ public interface ISharingDevice
 /// 25 m o mejor con el móvil moviéndose (sensor de movimiento significativo o velocidad del GPS de ir
 /// andando). La red (wifi y antenas) y el GPS con el móvil quieto van como aproximadas: solo la
 /// última posición del mapa.</para>
-/// <para><b>Por cada lectura válida</b> (reciente y, si es buena, a ≥ 25 m de la última enviada):
+/// <para><b>Por cada lectura que se envía</b> (reciente y, según <see cref="SendPolicy"/>, movida de
+/// verdad o de latido):
 /// se calculan los grupos donde comparto en ese momento, se encola en <see cref="LocationOutbox"/>
 /// con su hora original, se vacía la cola si hay red, y se evalúan las zonas
 /// (<see cref="ZoneWatcher"/>) informando de cada entrada o salida.</para>
@@ -69,6 +77,10 @@ public interface ISharingDevice
 /// pedidas, eventos) va junto en una sola vuelta: cada 60 s sin FCM, como antes, y con FCM cada
 /// <see cref="ServerCheckEveryWithPush"/>, de respaldo por si se perdió algún push (2026-10-06:
 /// antes, con FCM, la red se despertaba cada 5 min para nada).</para>
+/// <para><b>Cuándo se envía</b> (<see cref="SendPolicy"/>, 2026-10-12): al moverse de verdad o,
+/// aunque no se mueva, una vez cada hora (latido). Para el latido con el móvil quieto del todo,
+/// el servicio despierta con una alarma (<see cref="NextHeartbeatCheck"/>) y llama a
+/// <see cref="CheckHeartbeat"/>, que pide una lectura nueva al dispositivo.</para>
 /// <para><b>Quieto o moviéndose</b> (<see cref="LocationPlan"/>, 2026-10-06): el motor decide el
 /// modo con el sensor de movimiento, la velocidad del GPS y la hora de arranque, y se lo pide al
 /// dispositivo (<see cref="ISharingDevice.ApplyTracking"/>): con el móvil quieto, el GPS apagado.</para>
@@ -124,6 +136,7 @@ public sealed class SharingEngine(ISharingDevice device)
     private DateTimeOffset _lastStillLog = DateTimeOffset.MinValue;
     private DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
     private DateTimeOffset? _lastFastGps;
+    private DateTimeOffset _lastFixRequest = DateTimeOffset.MinValue;
     private readonly object _modeLock = new();
 
     /// <summary>El servicio está vivo: si no, lo que llega se ignora.</summary>
@@ -197,18 +210,26 @@ public sealed class SharingEngine(ISharingDevice device)
     /// <summary>
     /// ¿Qué se hace con esta lectura? (<see cref="ReadingPolicy"/>, FR-010 del 2026-09-28): solo el
     /// GPS de 25 m o mejor, con el móvil moviéndose, entra en el historial; la red y el GPS con el
-    /// móvil quieto solo actualizan la última posición (aproximada). Además: antigüedad y distancia
-    /// a la última enviada.
+    /// móvil quieto solo actualizan la última posición (aproximada). Además: antigüedad, y si se
+    /// envía (<see cref="Decide"/>). <see cref="ReadingKind.Discard"/> si no se envía.
     /// </summary>
     public ReadingKind Classify(LocationReading location, DateTimeOffset now)
     {
-        if (location.Accuracy is not { } accuracy)
-            return ReadingKind.Discard;
+        var (kind, reason) = Decide(location, now);
+        return reason == SendReason.Skip ? ReadingKind.Discard : kind;
+    }
 
-        if (now - location.At > MaxReadingAge)
-            return ReadingKind.Discard;
+    /// <summary>
+    /// La clase de la lectura (<see cref="ReadingPolicy"/>) y si se envía (<see cref="SendPolicy"/>:
+    /// al moverse de verdad o cada hora).
+    /// </summary>
+    public (ReadingKind Kind, SendReason Reason) Decide(LocationReading location, DateTimeOffset now)
+    {
+        if (location.Accuracy is not { } accuracy || now - location.At > MaxReadingAge)
+            return (ReadingKind.Discard, SendReason.Skip);
 
-        var firstOfRun = !_sentInThisRun || SharingState.LastSent is null;
+        var lastFine = SharingState.LastSent;
+        var firstOfRun = !_sentInThisRun || lastFine is null;
         var kind = ReadingPolicy.Classify(location.Provider, accuracy, location.Speed, device.MotionAvailable, device.LastMotion, now, firstOfRun);
 
         if (kind == ReadingKind.Coarse && location.Provider == GpsProvider &&
@@ -218,14 +239,21 @@ public sealed class SharingEngine(ISharingDevice device)
             NativeLog.Info($"GPS de {accuracy:F0} m con el móvil quieto: aproximada, fuera del historial.");
         }
 
-        if (kind != ReadingKind.Fine || firstOfRun || SharingState.LastSent is not { } last)
-            return kind;
+        if (kind == ReadingKind.Discard)
+            return (kind, SendReason.Skip);
 
-        // La cola decide si una aproximada vale (solo si en 10 min no ha habido otra); una buena
-        // tiene que estar a 25 m o más de la última enviada.
-        return device.DistanceMeters(last.Lat, last.Lon, location.Lat, location.Lon) >= ThresholdMeters
-            ? ReadingKind.Fine
-            : ReadingKind.Discard;
+        bool still;
+        DateTimeOffset since;
+        lock (_modeLock)
+        {
+            still = LocationPlan.ModeFor(device.MotionAvailable, device.LastMotion, _lastFastGps, _startedAt, now) == TrackingMode.Still;
+            since = _startedAt;
+        }
+
+        var last = SharingState.LastSentFix;
+        double? toFine = lastFine is { } f ? device.DistanceMeters(f.Lat, f.Lon, location.Lat, location.Lon) : null;
+        double? toLast = last is { } l ? device.DistanceMeters(l.Lat, l.Lon, location.Lat, location.Lon) : null;
+        return (kind, SendPolicy.Decide(kind, accuracy, toFine, toLast, last, firstOfRun, still, since, now));
     }
 
     public async Task ProcessReadingAsync(LocationReading location)
@@ -253,17 +281,26 @@ public sealed class SharingEngine(ISharingDevice device)
             try
             {
                 device.AcquireWakeLock();
-                var kind = Classify(location, DateTimeOffset.UtcNow);
+                var (kind, reason) = Decide(location, DateTimeOffset.UtcNow);
                 if (kind == ReadingKind.Discard)
                     return;
 
                 // GPS bueno con el móvil quieto: se guarda por si es el arranque de un recorrido
-                // (el sensor de movimiento llega tarde; MotionStartBuffer). Los demás, ni caso.
+                // (el sensor de movimiento llega tarde; MotionStartBuffer), se envíe o no. Los
+                // demás, ni caso.
                 if (kind == ReadingKind.Coarse)
                     _stillReadings.Hold(location.Provider, new TrackPoint(location.Lat, location.Lon, accuracy, location.At));
 
+                // La última válida, para el SOS, aunque no se envíe.
                 LastFix = location;
-                await HandleReadingAsync(location.Lat, location.Lon, accuracy, location.At, kind == ReadingKind.Coarse).ConfigureAwait(false);
+                if (reason == SendReason.Skip)
+                    return;
+
+                if (reason == SendReason.Heartbeat)
+                    NativeLog.Info($"Latido: una hora sin enviar nada; sale la posición ({accuracy:F0} m) aunque no se haya movido.");
+
+                await HandleReadingAsync(location.Lat, location.Lon, accuracy, location.At,
+                    kind == ReadingKind.Coarse, force: reason == SendReason.Heartbeat).ConfigureAwait(false);
             }
             finally
             {
@@ -322,7 +359,7 @@ public sealed class SharingEngine(ISharingDevice device)
         }
     }
 
-    private async Task HandleReadingAsync(double lat, double lon, double accuracy, DateTimeOffset at, bool coarse)
+    private async Task HandleReadingAsync(double lat, double lon, double accuracy, DateTimeOffset at, bool coarse, bool force = false)
     {
         var family = device.Get<FamilyService>();
         var outbox = device.Get<LocationOutbox>();
@@ -342,7 +379,10 @@ public sealed class SharingEngine(ISharingDevice device)
         {
             try
             {
-                var queued = await outbox.EnqueueAsync(lat, lon, accuracy, device.ReadBattery(), at, groups, coarse).ConfigureAwait(false);
+                var queued = await outbox.EnqueueAsync(lat, lon, accuracy, device.ReadBattery(), at, groups, coarse, force).ConfigureAwait(false);
+                // La referencia del latido y del movimiento de las aproximadas: solo lo que sale.
+                if (queued)
+                    SharingState.LastSentFix = new SentFix(lat, lon, accuracy, at);
                 // Una aproximada no cuenta como referencia: la siguiente buena tiene que salir.
                 if (!coarse)
                 {
@@ -442,6 +482,52 @@ public sealed class SharingEngine(ISharingDevice device)
     }
 
     // ==================================================================================
+    //  Latido de cada hora
+    // ==================================================================================
+
+    /// <summary>
+    /// Cuándo debe despertar el servicio para mirar el latido (<see cref="SendPolicy.NextCheck"/>):
+    /// a la hora de la última enviada o, si ya toca y no ha llegado nada, al reintento.
+    /// </summary>
+    public DateTimeOffset NextHeartbeatCheck(DateTimeOffset now)
+    {
+        DateTimeOffset since;
+        lock (_modeLock) since = _startedAt;
+        return SendPolicy.NextCheck(SharingState.LastSentFix, since, now);
+    }
+
+    /// <summary>
+    /// Si hace una hora que no sale nada, pide una lectura nueva al dispositivo (como mucho una
+    /// vez cada <see cref="SendPolicy.FixRetryEvery"/>); al llegar, <see cref="Decide"/> la envía
+    /// como latido. Lo llaman la alarma del servicio y el ciclo. Devuelve si la pidió.
+    /// </summary>
+    public bool CheckHeartbeat(DateTimeOffset now)
+    {
+        try
+        {
+            if (!Running)
+                return false;
+
+            lock (_modeLock)
+            {
+                if (!SendPolicy.HeartbeatDue(SharingState.LastSentFix, _startedAt, now) ||
+                    now - _lastFixRequest < SendPolicy.FixRetryEvery)
+                    return false;
+                _lastFixRequest = now;
+            }
+
+            NativeLog.Info("Latido: una hora sin enviar la posición; se pide una lectura nueva.");
+            device.RequestFreshFix();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Error("No se pudo pedir una lectura para el latido.", ex);
+            return false;
+        }
+    }
+
+    // ==================================================================================
     //  Ciclo de 60 s
     // ==================================================================================
 
@@ -454,6 +540,9 @@ public sealed class SharingEngine(ISharingDevice device)
 
             // Quieto desde hace un rato: fuera el GPS (si la alarma del servicio no lo hizo ya).
             UpdateTracking(DateTimeOffset.UtcNow);
+
+            // Una hora sin enviar nada: se pide una lectura (si la alarma no lo hizo ya).
+            CheckHeartbeat(DateTimeOffset.UtcNow);
 
             // Si todavía se está procesando una lectura, esta vuelta se salta: habrá otra en 60 s.
             if (!await _work.WaitAsync(0).ConfigureAwait(false))

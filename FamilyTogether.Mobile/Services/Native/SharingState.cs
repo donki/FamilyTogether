@@ -78,7 +78,7 @@ public static class SharingState
         }
     }
 
-    /// <summary>Última posición puesta en la cola, para el umbral de 25 m entre envíos.</summary>
+    /// <summary>Última posición buena puesta en la cola, para el umbral de 25 m entre envíos.</summary>
     public static (double Lat, double Lon)? LastSent
     {
         get
@@ -106,6 +106,55 @@ public static class SharingState
                 {
                     [KeyLastLat] = value?.Lat.ToString("R", CultureInfo.InvariantCulture),
                     [KeyLastLon] = value?.Lon.ToString("R", CultureInfo.InvariantCulture),
+                });
+            }
+            catch (Exception ex)
+            {
+                NativeLog.Warn("No se pudo guardar la última posición enviada.", ex);
+            }
+        }
+    }
+
+    private const string KeyLastAny = "last_any";
+
+    /// <summary>
+    /// Última posición puesta en la cola, buena o aproximada, con su precisión y su hora: la
+    /// referencia del latido de cada hora y del movimiento de las aproximadas (<see cref="SendPolicy"/>).
+    /// </summary>
+    public static SentFix? LastSentFix
+    {
+        get
+        {
+            try
+            {
+                // lat|lon|precisión|hora en ms Unix
+                var parts = Prefs?.GetString(KeyLastAny)?.Split('|');
+                if (parts is { Length: 4 } &&
+                    double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
+                    double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var lon) &&
+                    double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var acc) &&
+                    long.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ms))
+                    return new SentFix(lat, lon, acc, DateTimeOffset.FromUnixTimeMilliseconds(ms));
+            }
+            catch
+            {
+                // Sin dato: el latido cuenta desde el arranque del servicio.
+            }
+            return null;
+        }
+        set
+        {
+            try
+            {
+                Prefs?.Apply(new Dictionary<string, object?>
+                {
+                    [KeyLastAny] = value is { } f
+                        ? string.Join('|',
+                            f.Lat.ToString("R", CultureInfo.InvariantCulture),
+                            f.Lon.ToString("R", CultureInfo.InvariantCulture),
+                            f.Accuracy.ToString("R", CultureInfo.InvariantCulture),
+                            f.At.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture))
+                        : null,
                 });
             }
             catch (Exception ex)

@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.10.12.00",
+    "date": "2026-10-12",
+    "es": [
+      "Tu posición se envía cuando te mueves de verdad y, aunque estés quieto, una vez cada hora: tu grupo sabe que todo va bien sin que el móvil gaste de más.",
+      "Con el móvil quieto en casa ya no se envían posiciones cada pocos minutos por los saltos de la wifi o las antenas."
+    ],
+    "en": [
+      "Your position is sent when you really move and, even if you stay still, once an hour: your group knows you are fine without wasting battery.",
+      "When your phone is still at home it no longer sends a position every few minutes because of Wi-Fi or cell tower jumps."
+    ]
+  },
+  {
     "version": "2026.10.06.00",
     "date": "2026-10-06",
     "es": [
