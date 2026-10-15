@@ -195,16 +195,19 @@ public sealed class LocationSharing : ILocationSharing
     //  Batería y ajustes
     // ==================================================================================
 
+    /// <summary>
+    /// Excluida de la optimización de batería <b>y</b> sin restricción de segundo plano (2026-10-15):
+    /// con la app «Restringida» (Ajustes de Android o el ahorro de batería de MIUI/HyperOS), Android
+    /// puede cortar la ubicación con la pantalla apagada aunque esté excluida de la optimización.
+    /// </summary>
     public bool IsIgnoringBatteryOptimizations
     {
         get
         {
             try
             {
-                if (!OperatingSystem.IsAndroidVersionAtLeast(23))
-                    return true;
-                var power = (PowerManager?)AppContext.GetSystemService(Context.PowerService);
-                return power?.IsIgnoringBatteryOptimizations(AppContext.PackageName) ?? false;
+                var limits = BackgroundLimits.Read(AppContext);
+                return limits.IgnoringBatteryOptimizations && !limits.BackgroundRestricted;
             }
             catch
             {
@@ -217,6 +220,14 @@ public sealed class LocationSharing : ILocationSharing
     {
         if (!OperatingSystem.IsAndroidVersionAtLeast(23))
             return;
+
+        // Ya excluida pero «Restringida»: eso se cambia en la ficha de la app (Batería › Sin
+        // restricciones; en Xiaomi, Ahorro de batería › Sin restricciones).
+        if (BackgroundLimits.Read(AppContext) is { IgnoringBatteryOptimizations: true, BackgroundRestricted: true })
+        {
+            OpenAppSettings();
+            return;
+        }
 
         // Diálogo directo del sistema «¿Permitir que se ejecute siempre en segundo plano?».
         if (TryStart(new Intent(Settings.ActionRequestIgnoreBatteryOptimizations,

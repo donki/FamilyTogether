@@ -17,13 +17,13 @@ public static class AndroidTexts
     private static readonly Dictionary<string, string> Es = new()
     {
         ["AutostartGeneric"] = "Muchos móviles traen su propio gestor de batería o de inicio automático, que cierra las apps en segundo plano. Búscalo en Ajustes (suele estar en Batería o en Aplicaciones) y permite que esta app se inicie sola y funcione en segundo plano sin restricciones.",
-        ["AutostartXiaomi"] = "En Xiaomi, Redmi y POCO: abre Seguridad > Aplicaciones > Permisos > Inicio automático y activa esta app. Después, en Ajustes > Aplicaciones > esta app > Ahorro de batería, elige «Sin restricciones».",
+        ["AutostartXiaomi"] = "En Xiaomi, Redmi y POCO: abre Seguridad > Aplicaciones > Permisos > Inicio automático y activa esta app. Después, en Ajustes > Aplicaciones > esta app > Ahorro de batería, elige «Sin restricciones». Y en Recientes, mantén pulsada la tarjeta de la app y toca el candado para que no se cierre al limpiar.",
     };
 
     private static readonly Dictionary<string, string> En = new()
     {
         ["AutostartGeneric"] = "Many phones come with their own battery or autostart manager, which closes apps in the background. Look for it in Settings (usually under Battery or Apps) and let this app start on its own and run in the background without restrictions.",
-        ["AutostartXiaomi"] = "On Xiaomi, Redmi and POCO: open Security > Apps > Permissions > Autostart and turn this app on. Then, in Settings > Apps > this app > Battery saver, choose \"No restrictions\".",
+        ["AutostartXiaomi"] = "On Xiaomi, Redmi and POCO: open Security > Apps > Permissions > Autostart and turn this app on. Then, in Settings > Apps > this app > Battery saver, choose \"No restrictions\". And in Recents, press and hold the app's card and tap the lock so it is not closed when you clear them.",
     };
 
     /// <summary>Texto en el idioma de la interfaz; si falta la clave, la propia clave (se nota en pruebas).</summary>

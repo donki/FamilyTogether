@@ -1,5 +1,32 @@
 # Changelog — Family Together
 
+## 2026.10.15.00
+
+- **La posición sale también con la pantalla apagada** (petición de Josep, 2026-10-15; como
+  WhatsApp al compartir la ubicación en tiempo real: servicio en primer plano con su notificación
+  fija, que ya teníamos, y la app fuera del ahorro de batería). Lo que fallaba con la pantalla apagada:
+  - **La CPU se dormía entre la lectura y el envío**: el bloqueo de CPU se cogía dentro de una tarea
+    en otro hilo, después de que Android entregara la posición o el aviso del sensor de movimiento.
+    Ahora se coge en el mismo momento de la entrega (`RunAwake`) y se suelta al acabar. El bloqueo
+    lleva la cuenta de quién lo tiene: antes, el primer trabajo que acababa lo soltaba aunque otro
+    siguiera a medias; y el de la lectura del latido se quedaba cogido hasta su tiempo máximo.
+  - **Lo que no salía a la primera esperaba a que se encendiera la pantalla**: el reintento iba en
+    el ciclo de 60 s, que es un temporizador y se para con la CPU dormida; con el móvil quieto podía
+    tardar hasta el latido de la hora siguiente. Ahora, si queda algo pendiente (posiciones, zonas o
+    un SOS), el motor pide una **alarma de reintento** `setAndAllowWhileIdle` (también en Doze): a
+    los 2 min con red (el servidor falló) o a los 15 min sin red. Y el servicio **vigila la red**
+    (`registerDefaultNetworkCallback`): al volver (salir de Doze, pasar de wifi a datos, recuperar
+    cobertura) envía lo pendiente en ese momento.
+  - **Restricción de segundo plano**: el paso «Batería» de la guía y Ajustes solo dan por buena la
+    batería si la app está fuera de la optimización **y** no está «Restringida» (Android 9+; es lo
+    que pone el ahorro de batería de MIUI/HyperOS); si lo está, el botón abre la ficha de la app.
+    Al arrancar, el servicio deja en el registro si está restringida o si el ahorro de batería del
+    sistema apaga la ubicación con la pantalla apagada.
+  - En Xiaomi, la guía añade **bloquear la app en Recientes** (el candado), para que limpiar las
+    recientes no la cierre.
+  - No hace falta ningún permiso nuevo: `WAKE_LOCK`, ubicación en segundo plano, servicio en primer
+    plano de tipo `location` y `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` ya estaban.
+
 ## 2026.10.12.00
 
 - **La posición se envía al moverse o cada hora** (petición de Josep). Antes: una lectura buena (GPS

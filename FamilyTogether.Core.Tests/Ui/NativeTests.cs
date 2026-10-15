@@ -66,6 +66,8 @@ internal sealed class FakeDevice(IServiceProvider services) : ISharingDevice
         if (BrokenFreshFix) throw new InvalidOperationException("sin LocationManager");
         FreshFixRequests++;
     }
+    public List<TimeSpan> Retries { get; } = [];
+    public void ScheduleRetry(TimeSpan after) => Retries.Add(after);
     public List<TrackingMode> Applied { get; } = [];
     public bool BrokenTracking { get; set; }
     public void ApplyTracking(TrackingMode mode)
@@ -307,6 +309,60 @@ public class NativeTests : IDisposable
 
         Assert.Equal(1, await _host.Outbox.PendingCountAsync());
         Assert.Empty(_host.Server.To("POST", "/rest/v1/positions"));
+    }
+
+    [Fact]
+    public async Task Lectura_SinRedPideDespertarParaReintentar_ConLaRedAntes()
+    {
+        // Pantalla apagada: el ciclo de 60 s no corre; lo que no sale pide una alarma de reintento.
+        var world = new World(_host.Phone);
+        await world.GroupAsync("Casa");
+        var (engine, device) = Engine();
+        await SharingState.GetSharingGroupsAsync(_host.Phone.Service, true, TimeSpan.Zero);
+        device.Online = false;
+
+        await engine.ProcessReadingAsync(Gps(40, -3));
+
+        Assert.True(await engine.HasPendingAsync());
+        Assert.Equal([SharingEngine.RetryOfflineAfter], device.Retries);
+
+        // Vuelve la red: la vuelta del ciclo lo envía y ya no pide más reintentos.
+        device.Online = true;
+        device.Retries.Clear();
+        await engine.RunCycleAsync();
+        Assert.Equal(0, await _host.Outbox.PendingCountAsync());
+        Assert.False(await engine.HasPendingAsync());
+        Assert.Empty(device.Retries);
+    }
+
+    [Fact]
+    public async Task Lectura_ConRedPeroServidorCaido_ReintentaPronto()
+    {
+        var world = new World(_host.Phone);
+        await world.GroupAsync("Casa");
+        var (engine, device) = Engine();
+        await SharingState.GetSharingGroupsAsync(_host.Phone.Service, true, TimeSpan.Zero);
+        _host.Server.On("POST", "/rest/v1/positions", _ => World.Fail());
+
+        await engine.ProcessReadingAsync(Gps(40, -3));
+
+        Assert.Equal(1, await _host.Outbox.PendingCountAsync());
+        Assert.Equal([SharingEngine.RetryPendingAfter], device.Retries);
+    }
+
+    [Fact]
+    public async Task Lectura_EnviadaNoPideReintento()
+    {
+        var world = new World(_host.Phone);
+        await world.GroupAsync("Casa");
+        var (engine, device) = Engine();
+        await SharingState.GetSharingGroupsAsync(_host.Phone.Service, true, TimeSpan.Zero);
+
+        await engine.ProcessReadingAsync(Gps(40, -3));
+
+        Assert.Equal(0, await _host.Outbox.PendingCountAsync());
+        Assert.Empty(device.Retries);
+        Assert.Equal(device.WakeLocks, device.Releases);
     }
 
     [Fact]

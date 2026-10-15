@@ -6,7 +6,8 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// <summary>
 /// La alarma del latido de la posición (una vez por hora aunque el móvil no se mueva,
 /// <c>SendPolicy</c>). La programa <see cref="LocationSharingForegroundService"/> con
-/// <c>setAndAllowWhileIdle</c>, que salta también en Doze; aquí solo se le avisa.
+/// <c>setAndAllowWhileIdle</c>, que salta también en Doze; aquí solo se le avisa. También la del
+/// reintento de lo que quedó sin enviar (acción <see cref="LocationSharingForegroundService.RetryAction"/>).
 /// </summary>
 /// <remarks>No exportado: solo la recibe la propia app, por la alarma que ella misma programa.</remarks>
 [BroadcastReceiver(Exported = false)]
@@ -16,7 +17,10 @@ public class HeartbeatReceiver : BroadcastReceiver
     {
         try
         {
-            LocationSharingForegroundService.OnHeartbeatAlarm();
+            if (intent?.Action == LocationSharingForegroundService.RetryAction)
+                LocationSharingForegroundService.OnRetryAlarm();
+            else
+                LocationSharingForegroundService.OnHeartbeatAlarm();
         }
         catch (Exception ex)
         {

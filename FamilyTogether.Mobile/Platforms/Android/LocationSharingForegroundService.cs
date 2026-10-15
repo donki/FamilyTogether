@@ -35,7 +35,15 @@ namespace FamilyTogether.Mobile.Platforms.Android;
 /// última enviada; si toca, pide una lectura suelta (<see cref="RequestFreshFix"/>: la red, o el GPS
 /// con tiempo máximo) y el motor la envía como latido.</para>
 /// <para>Solo coge la CPU (bloqueo parcial con tiempo máximo) mientras procesa, no de forma
-/// continua como Hiker, que solo graba durante una ruta.</para>
+/// continua como Hiker, que solo graba durante una ruta. <b>Con la pantalla apagada</b>
+/// (2026-10-15) el bloqueo se coge en el mismo momento en que llega la posición, el movimiento o
+/// la alarma, antes de pasar el trabajo a otro hilo: si no, el móvil puede volver a dormirse entre
+/// la entrega y el envío. El bloqueo lleva la cuenta de quién lo tiene (varios trabajos a la vez)
+/// y se suelta al terminar el último.</para>
+/// <para><b>Lo que no sale a la primera</b> (sin red, Doze, el servidor falla) no espera al ciclo
+/// de 60 s, que es un temporizador y se para con la CPU dormida: el motor pide una alarma de
+/// reintento (<see cref="ScheduleRetry"/>, también en Doze) y el servicio vacía la cola en cuanto
+/// Android avisa de que vuelve la red (<see cref="WatchNetwork"/>).</para>
 /// </remarks>
 [Service(Exported = false, ForegroundServiceType = ForegroundService.TypeLocation)]
 public class LocationSharingForegroundService : Service, ILocationListener, ISharingDevice, AlarmManager.IOnAlarmListener
@@ -54,12 +62,21 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     /// <summary>Código del <see cref="PendingIntent"/> de la alarma del latido.</summary>
     private const int HeartbeatRequestCode = 7301;
 
+    /// <summary>Código del <see cref="PendingIntent"/> de la alarma de reintento de lo pendiente.</summary>
+    private const int RetryRequestCode = 7302;
+
+    /// <summary>Acción de la alarma de reintento (la recibe <see cref="HeartbeatReceiver"/>).</summary>
+    internal const string RetryAction = "com.socratic.familytogether.RETRY_PENDING";
+
     /// <summary>Verdadero mientras el servicio está vivo y en primer plano.</summary>
     public static bool IsRunning => _running;
 
     private readonly SharingEngine _engine;
     private LocationManager? _locationManager;
     private PowerManager.WakeLock? _wakeLock;
+    private readonly object _wakeLockGate = new();
+    private int _wakeLockHolders;
+    private NetworkWatcher? _network;
     private Timer? _timer;
     private bool _listening;
     private readonly SignificantMotion _motion = new();
@@ -131,6 +148,8 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
         StartListening();
         StartCycle();
         ScheduleHeartbeat();
+        WatchNetwork();
+        LogBackgroundLimits();
 
         // Sticky: si Android mata el proceso por memoria, recrea el servicio y se sigue compartiendo.
         return StartCommandResult.Sticky;
@@ -149,6 +168,8 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
             _timer = null;
             CancelStillCheck();
             CancelHeartbeat();
+            CancelRetry();
+            StopWatchingNetwork();
             StopListening();
             ReleaseWakeLock();
             if (OperatingSystem.IsAndroidVersionAtLeast(24))
@@ -464,6 +485,7 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
             if (recent is not null)
             {
                 Deliver(recent);
+                ReleaseWakeLock();
                 return;
             }
 
@@ -498,6 +520,7 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
                 {
                     try { manager.RemoveUpdates(once); }
                     catch (Exception) { /* Ya entregada o sin permiso: nada que quitar. */ }
+                    once.Finish();
                 }, timeout);
             }
         }
@@ -521,17 +544,29 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
             if (value is AndroidLocation location)
                 service.Deliver(location);
             else
-            {
                 NativeLog.Info("Latido: no ha llegado ninguna lectura a tiempo; se reintentará.");
-                service.ReleaseWakeLock();
-            }
+            // El bloqueo de RequestFreshFix (Deliver coge el suyo para el envío).
+            service.ReleaseWakeLock();
         }
     }
 
     /// <summary>La lectura suelta del latido (Android 7-10).</summary>
     private sealed class FreshFixListener(LocationSharingForegroundService service) : Java.Lang.Object, ILocationListener
     {
-        public void OnLocationChanged(AndroidLocation location) => service.Deliver(location);
+        private int _finished;
+
+        public void OnLocationChanged(AndroidLocation location)
+        {
+            service.Deliver(location);
+            Finish();
+        }
+
+        /// <summary>Suelta el bloqueo de RequestFreshFix una sola vez (llegue la lectura o se acabe el tiempo).</summary>
+        public void Finish()
+        {
+            if (Interlocked.Exchange(ref _finished, 1) == 0)
+                service.ReleaseWakeLock();
+        }
 
         public void OnProviderDisabled(string provider) { }
 
@@ -548,7 +583,22 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
         var reading = new LocationReading(location.Provider, location.Latitude, location.Longitude,
             location.HasAccuracy ? location.Accuracy : null, location.HasSpeed ? location.Speed : null,
             DateTimeOffset.FromUnixTimeMilliseconds(location.Time));
-        _ = Task.Run(() => _engine.ProcessReadingAsync(reading));
+        RunAwake(() => _engine.ProcessReadingAsync(reading));
+    }
+
+    /// <summary>
+    /// Pasa un trabajo a otro hilo con la CPU cogida desde ya (pantalla apagada: el sistema solo
+    /// garantiza que está despierta mientras dura la llamada que entrega la posición, el
+    /// movimiento o la alarma) hasta que termina.
+    /// </summary>
+    private void RunAwake(Func<Task> work)
+    {
+        AcquireWakeLock();
+        _ = Task.Run(async () =>
+        {
+            try { await work().ConfigureAwait(false); }
+            finally { ReleaseWakeLock(); }
+        });
     }
 
     public void OnProviderDisabled(string provider) => NativeLog.Info($"Proveedor de ubicación apagado: {provider}");
@@ -562,7 +612,152 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     {
         // Lo primero, encender el GPS si estaba quieto (el aviso del sensor ya llega con retraso).
         _engine.UpdateTracking(at);
-        _ = Task.Run(() => _engine.PromoteStillReadingsAsync(at));
+        RunAwake(() => _engine.PromoteStillReadingsAsync(at));
+    }
+
+    // ==================================================================================
+    //  Reintento de lo pendiente (alarma que despierta también en Doze) y vuelta de la red
+    // ==================================================================================
+
+    /// <summary>
+    /// Alarma para reintentar lo que no salió (<see cref="SharingEngine.RetryPendingAfter"/>). Como la
+    /// del latido: inexacta, con «AllowWhileIdle» y sin permiso de alarmas exactas. La nueva
+    /// sustituye a la anterior (mismo código).
+    /// </summary>
+    public void ScheduleRetry(TimeSpan after)
+    {
+        try
+        {
+            if (!_running || GetSystemService(AlarmService) is not AlarmManager alarms || RetryIntent() is not { } pending)
+                return;
+
+            alarms.SetAndAllowWhileIdle(AlarmType.ElapsedRealtimeWakeup,
+                SystemClock.ElapsedRealtime() + (long)after.TotalMilliseconds, pending);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo programar el reintento de lo pendiente.", ex);
+        }
+    }
+
+    private void CancelRetry()
+    {
+        try
+        {
+            if (GetSystemService(AlarmService) is AlarmManager alarms && RetryIntent() is { } pending)
+                alarms.Cancel(pending);
+        }
+        catch (Exception)
+        {
+            // Nada que cancelar.
+        }
+    }
+
+    private PendingIntent? RetryIntent()
+    {
+        var intent = new Intent(this, typeof(HeartbeatReceiver));
+        intent.SetAction(RetryAction);
+        return PendingIntent.GetBroadcast(this, RetryRequestCode, intent,
+            PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+    }
+
+    /// <summary>La alarma de reintento (<see cref="HeartbeatReceiver"/>): una vuelta del ciclo, despierta.</summary>
+    internal static void OnRetryAlarm()
+    {
+        var service = _instance;
+        if (service is null || !_running)
+            return;
+
+        NativeLog.Info("Reintento de lo que quedó sin enviar.");
+        service.RunAwake(service._engine.RunCycleAsync);
+    }
+
+    /// <summary>
+    /// En cuanto Android avisa de que hay red (al salir de Doze, al pasar de wifi a datos, al volver
+    /// la cobertura), se envía lo pendiente sin esperar a la alarma de reintento.
+    /// </summary>
+    private void WatchNetwork()
+    {
+        if (_network is not null || !OperatingSystem.IsAndroidVersionAtLeast(24))
+            return;
+
+        try
+        {
+            if (GetSystemService(ConnectivityService) is not ConnectivityManager connectivity)
+                return;
+            var watcher = new NetworkWatcher(this);
+            connectivity.RegisterDefaultNetworkCallback(watcher);
+            _network = watcher;
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo vigilar la red; lo pendiente se reintentará con la alarma.", ex);
+        }
+    }
+
+    private void StopWatchingNetwork()
+    {
+        if (_network is not { } watcher)
+            return;
+        _network = null;
+        try
+        {
+            if (GetSystemService(ConnectivityService) is ConnectivityManager connectivity)
+                connectivity.UnregisterNetworkCallback(watcher);
+        }
+        catch (Exception)
+        {
+            // Ya quitado.
+        }
+    }
+
+    private sealed class NetworkWatcher(LocationSharingForegroundService service) : ConnectivityManager.NetworkCallback
+    {
+        public override void OnAvailable(Network network)
+        {
+            if (_running)
+                service.RunAwake(service.FlushIfPendingAsync);
+        }
+    }
+
+    /// <summary>Si hay algo pendiente, una vuelta del ciclo (si no, nada: la red va y viene a menudo).</summary>
+    private async Task FlushIfPendingAsync()
+    {
+        try
+        {
+            if (await _engine.HasPendingAsync().ConfigureAwait(false))
+            {
+                NativeLog.Info("Ha vuelto la red: se envía lo pendiente.");
+                await _engine.RunCycleAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo enviar lo pendiente al volver la red.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Deja en el registro lo que puede cortar la posición con la pantalla apagada
+    /// (<see cref="BackgroundLimits"/>): la app restringida en segundo plano y el ahorro de batería
+    /// del sistema cuando apaga la ubicación con la pantalla apagada.
+    /// </summary>
+    private void LogBackgroundLimits()
+    {
+        try
+        {
+            var limits = BackgroundLimits.Read(this);
+            if (limits.BackgroundRestricted)
+                NativeLog.Warn("La app está restringida en segundo plano: Android puede cortar la ubicación con la pantalla apagada (Batería de la app › Sin restricciones).");
+            if (limits.LocationOffWhenScreenOff)
+                NativeLog.Warn("El ahorro de batería está activo y apaga la ubicación (o el GPS) con la pantalla apagada.");
+            if (!limits.IgnoringBatteryOptimizations)
+                NativeLog.Info("La app no está excluida de la optimización de batería.");
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudieron leer los límites de segundo plano.", ex);
+        }
     }
 
     // ==================================================================================
@@ -575,7 +770,7 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
             return;
 
         // Primera pasada a los pocos segundos: recoge lo que quedara pendiente de antes.
-        _timer = new Timer(_ => _ = Task.Run(_engine.RunCycleAsync), null, TimeSpan.FromSeconds(5), CycleEvery);
+        _timer = new Timer(_ => RunAwake(_engine.RunCycleAsync), null, TimeSpan.FromSeconds(5), CycleEvery);
     }
 
     // ==================================================================================
@@ -638,18 +833,30 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
         }
     }
 
+    /// <summary>
+    /// Coge la CPU. Lleva la cuenta: con varios trabajos a la vez (una posición mientras corre el
+    /// ciclo), el bloqueo no se suelta hasta que acaba el último. Cada vez renueva el tiempo máximo
+    /// (<see cref="WakeLockTimeoutMs"/>), que es el seguro si algo no lo soltara.
+    /// </summary>
     public void AcquireWakeLock()
     {
         try
         {
-            if (_wakeLock is null)
+            lock (_wakeLockGate)
             {
-                var power = (PowerManager?)GetSystemService(PowerService);
-                _wakeLock = power?.NewWakeLock(WakeLockFlags.Partial, "FamilyTogether:location");
-                _wakeLock?.SetReferenceCounted(false);
-            }
+                if (_wakeLock is null)
+                {
+                    var power = (PowerManager?)GetSystemService(PowerService);
+                    _wakeLock = power?.NewWakeLock(WakeLockFlags.Partial, "FamilyTogether:location");
+                    _wakeLock?.SetReferenceCounted(false);
+                }
 
-            _wakeLock?.Acquire(WakeLockTimeoutMs);
+                // Caducado por tiempo con trabajos aún contados: la cuenta empieza de nuevo.
+                if (_wakeLock is { IsHeld: false })
+                    _wakeLockHolders = 0;
+                _wakeLockHolders++;
+                _wakeLock?.Acquire(WakeLockTimeoutMs);
+            }
         }
         catch (Exception ex)
         {
@@ -661,8 +868,13 @@ public class LocationSharingForegroundService : Service, ILocationListener, ISha
     {
         try
         {
-            if (_wakeLock is { IsHeld: true })
-                _wakeLock.Release();
+            lock (_wakeLockGate)
+            {
+                if (_wakeLockHolders > 0)
+                    _wakeLockHolders--;
+                if (_wakeLockHolders == 0 && _wakeLock is { IsHeld: true })
+                    _wakeLock.Release();
+            }
         }
         catch
         {

@@ -51,6 +51,14 @@ public interface ISharingDevice
     /// </summary>
     void RequestFreshFix();
 
+    /// <summary>
+    /// Despertar al servicio dentro de <paramref name="after"/> para reintentar lo que quedó sin
+    /// enviar (<see cref="SharingEngine.RunCycleAsync"/>), también con la pantalla apagada y en Doze:
+    /// el ciclo de 60 s es un temporizador que se para cuando la CPU duerme. La nueva sustituye a la
+    /// anterior. Puede llamarse desde cualquier hilo.
+    /// </summary>
+    void ScheduleRetry(TimeSpan after);
+
     /// <summary>Coge la CPU (con tiempo máximo) mientras se procesa.</summary>
     void AcquireWakeLock();
 
@@ -120,6 +128,20 @@ public sealed class SharingEngine(ISharingDevice device)
 
     /// <summary>Cada cuánto se poda el recorrido local (antes, en cada vuelta: una escritura por minuto).</summary>
     public static readonly TimeSpan PruneEvery = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// Si algo se queda sin enviar (sin red, el servidor falla), cuándo se reintenta aunque la
+    /// pantalla esté apagada (<see cref="ISharingDevice.ScheduleRetry"/>). En Doze Android lo junta
+    /// con su ventana de mantenimiento (como mucho una alarma cada 9 min por app); además, el
+    /// servicio reintenta en cuanto vuelve la red.
+    /// </summary>
+    public static readonly TimeSpan RetryPendingAfter = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Lo mismo sin red: lo normal es que el servicio se entere de que vuelve (y vacíe la cola en ese
+    /// momento); esto es el respaldo, más espaciado para no despertar el móvil sin cobertura.
+    /// </summary>
+    public static readonly TimeSpan RetryOfflineAfter = TimeSpan.FromMinutes(15);
 
     /// <summary>Tope de entradas y salidas de zona pendientes de informar.</summary>
     public const int MaxPendingZoneEvents = 50;
@@ -424,6 +446,37 @@ public sealed class SharingEngine(ISharingDevice device)
 
         if (online)
             await ReportZoneEventsAsync(family).ConfigureAwait(false);
+
+        await ScheduleRetryIfPendingAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// ¿Queda algo sin enviar (posiciones, zonas, SOS)? Entonces se pide al dispositivo que despierte
+    /// para reintentarlo (<see cref="RetryPendingAfter"/>): con la pantalla apagada el ciclo de 60 s
+    /// no corre y, con el móvil quieto, la siguiente lectura podría tardar una hora (el latido).
+    /// </summary>
+    private async Task ScheduleRetryIfPendingAsync()
+    {
+        try
+        {
+            if (!await HasPendingAsync().ConfigureAwait(false))
+                return;
+            device.ScheduleRetry(device.IsOnline() ? RetryPendingAfter : RetryOfflineAfter);
+        }
+        catch (Exception ex)
+        {
+            NativeLog.Warn("No se pudo programar el reintento de lo pendiente.", ex);
+        }
+    }
+
+    /// <summary>Queda algo por enviar: posiciones en la cola, entradas o salidas de zona o un SOS.</summary>
+    public async Task<bool> HasPendingAsync()
+    {
+        if (PendingZoneEvents > 0)
+            return true;
+        if (device.Get<SosService>() is { HasPending: true })
+            return true;
+        return device.Get<LocationOutbox>() is { } outbox && await outbox.PendingCountAsync().ConfigureAwait(false) > 0;
     }
 
     private static async Task FlushAsync(LocationOutbox outbox, FamilyService family)
@@ -552,6 +605,7 @@ public sealed class SharingEngine(ISharingDevice device)
             {
                 device.AcquireWakeLock();
                 await CycleAsync().ConfigureAwait(false);
+                await ScheduleRetryIfPendingAsync().ConfigureAwait(false);
             }
             finally
             {

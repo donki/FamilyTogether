@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.10.15.00",
+    "date": "2026-10-15",
+    "es": [
+      "Tu posición sale también con la pantalla apagada: el móvil ya no se duerme a mitad del envío, y si no había red se envía en cuanto vuelve.",
+      "La guía avisa si Android o tu móvil tienen la app restringida en segundo plano, que es lo que corta la ubicación con la pantalla apagada."
+    ],
+    "en": [
+      "Your position is also sent with the screen off: the phone no longer falls asleep halfway through sending, and if there was no network it is sent as soon as it is back.",
+      "The guide warns you if Android or your phone restricts the app in the background, which is what cuts off location with the screen off."
+    ]
+  },
+  {
     "version": "2026.10.12.00",
     "date": "2026-10-12",
     "es": [
