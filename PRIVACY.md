@@ -62,6 +62,17 @@ cada una. Para eso tiene que compartir tu ubicación con tu grupo, y lo hace as�
 - **Notificaciones**: para los SOS, las zonas y las solicitudes de entrada.
 - **Cámara**: solo para escanear el código QR de una invitación.
 
+## Borrar tu usuario y tus datos
+
+- **Solo tu historial**: en la app, Ajustes › Historial › «Borrar mi historial» (o la papelera de
+  Historial). Se borran tus posiciones en todos tus grupos al momento; queda tu última posición.
+- **Tu usuario entero**: escribe a jsoladelarosa@gmail.com con el asunto «Family Together: borrar mi
+  usuario» desde la cuenta de Google o Microsoft que vinculaste (o, si no vinculaste ninguna, con el
+  nombre de tu grupo y tu nombre visible). En un plazo de 30 días borramos tu usuario, tus
+  posiciones, tus membresías, tus zonas, tus avisos, tus SOS, tu token de avisos y la cuenta
+  vinculada. No conservamos nada. Desinstalar la app borra también lo que guarda en el móvil.
+- Aunque no lo pidas, el historial se borra solo a los 30 días.
+
 ## Tus derechos
 
 Puedes pausar la compartición, abandonar tus grupos o desinstalar la app en cualquier momento.
@@ -133,6 +144,17 @@ do that it has to share your location with your group, and it does so like this:
 - **Location foreground service**: Android requires it for that; you will see a persistent notification.
 - **Notifications**: for SOS, zones and join requests.
 - **Camera**: only to scan an invitation QR code.
+
+## Deleting your user and your data
+
+- **Only your history**: in the app, Settings › History › "Delete my history" (or the bin in
+  History). Your positions in all your groups are deleted at once; your last position is kept.
+- **Your whole user**: write to jsoladelarosa@gmail.com with the subject "Family Together: delete my
+  user" from the Google or Microsoft account you linked (or, if you linked none, with your group's
+  name and your display name). Within 30 days we delete your user, your positions, your
+  memberships, your zones, your alerts, your SOS, your notification token and the linked account.
+  We keep nothing. Uninstalling the app also deletes what it stores on the phone.
+- Even if you do not ask, history is deleted automatically after 30 days.
 
 ## Your rights
 
