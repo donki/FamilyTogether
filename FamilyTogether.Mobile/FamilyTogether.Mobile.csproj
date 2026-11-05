@@ -16,8 +16,8 @@
     <ApplicationId>com.socratic.familytogether</ApplicationId>
 
     <!-- Version (constitucion Mobile 3: los dos valores en sincronia, esquema de fecha) -->
-    <ApplicationDisplayVersion>2026.10.15.00</ApplicationDisplayVersion>
-    <ApplicationVersion>2026101500</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.11.05.00</ApplicationDisplayVersion>
+    <ApplicationVersion>2026110500</ApplicationVersion>
 
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
 
@@ -39,9 +39,12 @@
     <TargetSdkVersion>36</TargetSdkVersion>
     <AndroidUseLatestPlatformSdk>false</AndroidUseLatestPlatformSdk>
     <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
+    <!-- Con 32 bits: .NET 10 solo compila arm64/x64 por defecto y los móviles con Android de 32 bits
+         veían en Play «tu dispositivo no es compatible con esta versión». -->
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x64</RuntimeIdentifiers>
 
-    <AssemblyVersion>2026.10.15.0</AssemblyVersion>
-    <FileVersion>2026.10.15.0</FileVersion>
+    <AssemblyVersion>2026.11.5.0</AssemblyVersion>
+    <FileVersion>2026.11.5.0</FileVersion>
   </PropertyGroup>
 
   <!--

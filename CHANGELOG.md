@@ -1,5 +1,12 @@
 # Changelog — Family Together
 
+## 2026.11.05.00
+
+- **Primera versión en Google Play** (prueba cerrada). La app se ha dado de alta en Play Console con
+  la misma clave de firma que File Manager.
+- **Móviles de 32 bits**: el paquete lleva también `armeabi-v7a`. .NET 10 solo compila arm64 y x64
+  por defecto, y Play decía «tu dispositivo no es compatible» en los Android de 32 bits.
+
 ## 2026.10.15.00
 
 - **La posición sale también con la pantalla apagada** (petición de Josep, 2026-10-15; como
